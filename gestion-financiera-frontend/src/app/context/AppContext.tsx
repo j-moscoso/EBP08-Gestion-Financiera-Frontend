@@ -34,77 +34,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [categories, setCategories] = useState<Category[]>([
     { id: '1', name: 'Sin categoría', icon: '📋', isDefault: true },
-    { id: '2', name: 'Alimentación', icon: '🍔' },
-    { id: '3', name: 'Transporte', icon: '🚗' },
-    { id: '4', name: 'Entretenimiento', icon: '🎬' },
-    { id: '5', name: 'Servicios', icon: '💡' },
-    { id: '6', name: 'Salud', icon: '⚕️' },
-    { id: '7', name: 'Educación', icon: '📚' },
-    { id: '8', name: 'Salario', icon: '💰' },
-    { id: '9', name: 'Freelance', icon: '💻' },
-    { id: '10', name: 'Inversiones', icon: '📈' },
   ]);
 
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    {
-      id: '1',
-      description: 'Salario mensual',
-      amount: 3500000,
-      type: 'income',
-      categoryId: '8',
-      date: new Date(2026, 3, 1).toISOString(),
-    },
-    {
-      id: '2',
-      description: 'Compra en supermercado',
-      amount: 185000,
-      type: 'expense',
-      categoryId: '2',
-      date: new Date(2026, 3, 3).toISOString(),
-    },
-    {
-      id: '3',
-      description: 'Gasolina',
-      amount: 120000,
-      type: 'expense',
-      categoryId: '3',
-      date: new Date(2026, 3, 4).toISOString(),
-    },
-    {
-      id: '4',
-      description: 'Proyecto freelance',
-      amount: 800000,
-      type: 'income',
-      categoryId: '9',
-      date: new Date(2026, 3, 5).toISOString(),
-    },
-  ]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const [budgets, setBudgets] = useState<Budget[]>([
-    {
-      id: '1',
-      name: 'Presupuesto General',
-      amount: 2500000,
-      spent: 305000,
-      month: '2026-04',
-    },
-    {
-      id: '2',
-      name: 'Alimentación',
-      amount: 800000,
-      spent: 185000,
-      categoryId: '2',
-      month: '2026-04',
-    },
-    {
-      id: '3',
-      name: 'Transporte',
-      amount: 400000,
-      spent: 120000,
-      categoryId: '3',
-      month: '2026-04',
-    },
-  ]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
 
   const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
     const newTransaction: Transaction = {
