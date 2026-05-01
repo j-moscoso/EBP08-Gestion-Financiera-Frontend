@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { UserPlus, Mail, Lock, User, Wallet, Eye, EyeOff, CheckCircle2, Loader2 } from 'lucide-react';
+import { UserPlus, Mail, Lock, User, Eye, EyeOff, CheckCircle2, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
+import logo from '../../imports/Logo_login.png';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -76,9 +77,11 @@ export function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Logo y Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl">
-            <Wallet className="w-10 h-10 text-primary-foreground" />
-          </div>
+          <img
+            src={logo}
+            alt="Logo"
+            className="w-20 h-20 object-contain mx-auto mb-4"
+          />
           <h1 className="text-foreground mb-2">Crear Cuenta</h1>
           <p className="text-muted-foreground">Comienza a gestionar tus finanzas personales</p>
         </div>

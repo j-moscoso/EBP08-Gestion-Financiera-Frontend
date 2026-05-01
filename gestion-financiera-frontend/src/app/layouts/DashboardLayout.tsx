@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation, Link } from 'react-router';
-import { LogOut, Wallet, LayoutDashboard, Target, FolderOpen, Menu, X } from 'lucide-react';
+import { LogOut, Wallet, LayoutDashboard, Target, FolderOpen, Menu, X, TrendingUp, TrendingDown, User } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useState, useEffect } from 'react';
 
@@ -28,7 +28,10 @@ export function DashboardLayout() {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/budgets', label: 'Presupuestos', icon: Target },
+    { path: '/incomes', label: 'Ingresos', icon: TrendingUp },
+    { path: '/expenses', label: 'Gastos', icon: TrendingDown },
     { path: '/categories', label: 'Categorías', icon: FolderOpen },
+    { path: '/profile', label: 'Perfil', icon: User },
   ];
 
   const isActive = (path: string) => {

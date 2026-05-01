@@ -7,6 +7,17 @@ export interface Transaction {
   date: string;
 }
 
+export interface ScheduledTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  categoryId: string;
+  startDate: string;
+  endDate: string;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -27,4 +38,11 @@ export interface User {
   id: string;
   name: string;
   email: string;
+}
+
+export interface PasswordResetToken {
+  email: string;
+  token: string;
+  expiresAt: number;
+  used: boolean;
 }

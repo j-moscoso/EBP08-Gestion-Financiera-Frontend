@@ -74,6 +74,22 @@ export function BudgetsPage() {
 
   const availableCategories = categories.filter(c => !c.isDefault);
 
+  // Calcular gastos por categoría del mes seleccionado
+  const getCategorySpent = (categoryId: string) => {
+    return transactions
+      .filter(t => t.type === 'expense' && t.categoryId === categoryId && t.date.startsWith(selectedMonth))
+      .reduce((sum, t) => sum + t.amount, 0);
+  };
+
+  // Calcular gasto total del mes
+  const getTotalSpent = () => {
+    return transactions
+      .filter(t => t.type === 'expense' && t.date.startsWith(selectedMonth))
+      .reduce((sum, t) => sum + t.amount, 0);
+  };
+
+  const totalSpent = getTotalSpent();
+
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
@@ -224,7 +240,7 @@ export function BudgetsPage() {
       )}
 
       {/* Presupuesto Global */}
-      {globalBudget && (
+      {globalBudget ? (
         <div className="bg-gradient-to-br from-primary/5 via-secondary/5 to-primary/5 p-6 rounded-2xl border-2 border-primary/20 shadow-xl">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -236,13 +252,13 @@ export function BudgetsPage() {
                 <p className="text-muted-foreground">Presupuesto mensual general</p>
               </div>
             </div>
-            {getStatusIcon(getProgress(globalBudget.spent, globalBudget.amount))}
+            {getStatusIcon(getProgress(totalSpent, globalBudget.amount))}
           </div>
 
           <div className="space-y-3">
             <div className="flex justify-between items-baseline">
               <span className="text-muted-foreground">Gastado</span>
-              <span className="text-destructive text-2xl">{formatCurrency(globalBudget.spent)}</span>
+              <span className="text-destructive text-2xl">{formatCurrency(totalSpent)}</span>
             </div>
             <div className="flex justify-between items-baseline">
               <span className="text-muted-foreground">Límite</span>
@@ -251,7 +267,7 @@ export function BudgetsPage() {
             <div className="flex justify-between items-baseline">
               <span className="text-muted-foreground">Disponible</span>
               <span className="text-primary text-2xl">
-                {formatCurrency(Math.max(globalBudget.amount - globalBudget.spent, 0))}
+                {formatCurrency(Math.max(globalBudget.amount - totalSpent, 0))}
               </span>
             </div>
 
@@ -260,53 +276,130 @@ export function BudgetsPage() {
               <div className="flex justify-between items-center mb-2">
                 <span className="text-muted-foreground">Progreso</span>
                 <span className="text-foreground">
-                  {getProgress(globalBudget.spent, globalBudget.amount).toFixed(0)}%
+                  {getProgress(totalSpent, globalBudget.amount).toFixed(0)}%
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                 <div
-                  className={`h-full ${getProgressColor(getProgress(globalBudget.spent, globalBudget.amount))} transition-all duration-500 rounded-full`}
-                  style={{ width: `${getProgress(globalBudget.spent, globalBudget.amount)}%` }}
+                  className={`h-full ${getProgressColor(getProgress(totalSpent, globalBudget.amount))} transition-all duration-500 rounded-full`}
+                  style={{ width: `${getProgress(totalSpent, globalBudget.amount)}%` }}
                 ></div>
               </div>
+              {getProgress(totalSpent, globalBudget.amount) > 100 && (
+                <div className="mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-destructive text-sm">
+                    ¡Has superado tu presupuesto mensual!
+                  </p>
+                </div>
+              )}
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="bg-card p-8 rounded-xl border border-border text-center shadow-md">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+            <Target className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-foreground mb-2">Debes definir un presupuesto primero</h3>
+          <p className="text-muted-foreground mb-4">
+            Crea un presupuesto global para empezar a controlar tus gastos
+          </p>
+          <button
+            onClick={() => {
+              setBudgetType('global');
+              setShowForm(true);
+            }}
+            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Crear Presupuesto Global
+          </button>
         </div>
       )}
 
       {/* Presupuestos por Categoría */}
       <div>
         <h2 className="text-foreground mb-4">Presupuestos por Categoría</h2>
-        
-        {categoryBudgets.length === 0 ? (
+
+        {availableCategories.length === 0 ? (
           <div className="bg-card p-8 rounded-xl border border-border text-center shadow-md">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <Target className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-foreground mb-2">No hay presupuestos por categoría</h3>
+            <h3 className="text-foreground mb-2">No hay categorías disponibles</h3>
             <p className="text-muted-foreground">
-              Crea presupuestos específicos para cada categoría de gasto
+              Crea categorías primero para poder asignarles presupuestos
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categoryBudgets.map((budget) => {
-              const category = categories.find(c => c.id === budget.categoryId);
-              const progress = getProgress(budget.spent, budget.amount);
+            {availableCategories.map((category) => {
+              const budget = categoryBudgets.find(b => b.categoryId === category.id);
+              const spent = getCategorySpent(category.id);
+
+              if (!budget) {
+                return (
+                  <div
+                    key={category.id}
+                    className="bg-card p-5 rounded-xl border border-dashed border-muted-foreground/30 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center text-xl">
+                          {category.icon}
+                        </div>
+                        <div>
+                          <h3 className="text-foreground">{category.name}</h3>
+                          <p className="text-muted-foreground text-sm">Sin presupuesto definido</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mb-3">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground text-sm">Gastado</span>
+                        <span className="text-destructive">{formatCurrency(spent)}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setBudgetType('category');
+                        setCategoryId(category.id);
+                        setShowForm(true);
+                      }}
+                      className="w-full mt-2 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm"
+                    >
+                      Asignar presupuesto
+                    </button>
+                  </div>
+                );
+              }
+
+              const progress = getProgress(spent, budget.amount);
+              const available = Math.max(budget.amount - spent, 0);
 
               return (
                 <div
-                  key={budget.id}
-                  className="bg-card p-5 rounded-xl border border-border hover:shadow-lg transition-shadow"
+                  key={category.id}
+                  className={`bg-card p-5 rounded-xl border-2 transition-all ${
+                    progress > 100
+                      ? 'border-destructive/50 shadow-lg shadow-destructive/10'
+                      : progress > 75
+                      ? 'border-orange-500/50 shadow-lg shadow-orange-500/10'
+                      : 'border-primary/20 hover:shadow-lg'
+                  }`}
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center text-xl">
-                        {category?.icon}
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${
+                        progress > 100 ? 'bg-destructive/10' : 'bg-primary/10'
+                      }`}>
+                        {category.icon}
                       </div>
                       <div>
-                        <h3 className="text-foreground">{budget.name}</h3>
-                        <p className="text-muted-foreground text-sm">{category?.name}</p>
+                        <h3 className="text-foreground">{category.name}</h3>
+                        <p className="text-muted-foreground text-sm">{budget.name}</p>
                       </div>
                     </div>
                     {getStatusIcon(progress)}
@@ -314,12 +407,16 @@ export function BudgetsPage() {
 
                   <div className="space-y-2 mb-3">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground text-sm">Gastado</span>
-                      <span className="text-destructive">{formatCurrency(budget.spent)}</span>
+                      <span className="text-muted-foreground text-sm">Asignado</span>
+                      <span className="text-foreground">{formatCurrency(budget.amount)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground text-sm">Límite</span>
-                      <span className="text-foreground">{formatCurrency(budget.amount)}</span>
+                      <span className="text-muted-foreground text-sm">Gastado</span>
+                      <span className="text-destructive">{formatCurrency(spent)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground text-sm">Disponible</span>
+                      <span className="text-primary">{formatCurrency(available)}</span>
                     </div>
                   </div>
 
@@ -327,11 +424,14 @@ export function BudgetsPage() {
                   <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                     <div
                       className={`h-full ${getProgressColor(progress)} transition-all duration-500`}
-                      style={{ width: `${progress}%` }}
+                      style={{ width: `${Math.min(progress, 100)}%` }}
                     ></div>
                   </div>
-                  <div className="mt-2 text-right">
+                  <div className="mt-2 flex items-center justify-between">
                     <span className="text-muted-foreground text-xs">{progress.toFixed(0)}%</span>
+                    {progress > 100 && (
+                      <span className="text-destructive text-xs">¡Límite superado!</span>
+                    )}
                   </div>
                 </div>
               );

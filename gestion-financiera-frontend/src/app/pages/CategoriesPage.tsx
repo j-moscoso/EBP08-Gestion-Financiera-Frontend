@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { Plus, FolderOpen } from 'lucide-react';
+import { Plus, FolderOpen, Pencil, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
+import type { Category } from '../types';
 
 export function CategoriesPage() {
-  const { categories, addCategory } = useApp();
+  const { categories, addCategory, updateCategory, deleteCategory, transactions, scheduledTransactions } = useApp();
   const [showForm, setShowForm] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('📁');
 
@@ -17,17 +20,44 @@ export function CategoriesPage() {
       return;
     }
 
-    addCategory({
-      name,
-      icon,
-    });
-
-    toast.success('Categoría creada exitosamente');
+    if (editingCategory) {
+      updateCategory(editingCategory.id, { name, icon });
+      toast.success('Información actualizada');
+      setEditingCategory(null);
+    } else {
+      addCategory({ name, icon });
+      toast.success('Categoría creada exitosamente');
+    }
 
     // Reset form
     setName('');
     setIcon('📁');
     setShowForm(false);
+  };
+
+  const handleEdit = (category: Category) => {
+    setEditingCategory(category);
+    setName(category.name);
+    setIcon(category.icon);
+    setShowForm(true);
+  };
+
+  const handleDelete = (category: Category) => {
+    setDeletingCategory(category);
+  };
+
+  const confirmDelete = () => {
+    if (!deletingCategory) return;
+
+    deleteCategory(deletingCategory.id);
+    toast.success('Categoría eliminada');
+    setDeletingCategory(null);
+  };
+
+  const getCategoryUsageCount = (categoryId: string) => {
+    const transactionCount = transactions.filter(t => t.categoryId === categoryId).length;
+    const scheduledCount = scheduledTransactions.filter(t => t.categoryId === categoryId).length;
+    return transactionCount + scheduledCount;
   };
 
   const commonIcons = [
@@ -55,12 +85,14 @@ export function CategoriesPage() {
         </button>
       </div>
 
-      {/* Formulario de Nueva Categoría */}
+      {/* Formulario de Nueva/Editar Categoría */}
       {showForm && (
         <div className="bg-card p-6 rounded-xl shadow-md border border-border">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-foreground">Crear Nueva Categoría</h2>
+              <h2 className="text-foreground">
+                {editingCategory ? 'Editar Categoría' : 'Crear Nueva Categoría'}
+              </h2>
             </div>
 
             {/* Nombre */}
@@ -115,12 +147,17 @@ export function CategoriesPage() {
                 type="submit"
                 className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
               >
-                <Plus className="w-5 h-5" />
-                Crear Categoría
+                {editingCategory ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                {editingCategory ? 'Actualizar Categoría' : 'Crear Categoría'}
               </button>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingCategory(null);
+                  setName('');
+                  setIcon('📁');
+                }}
                 className="px-6 py-3 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancelar
@@ -149,7 +186,7 @@ export function CategoriesPage() {
                 key={category.id}
                 className="bg-card p-4 rounded-xl border border-border hover:shadow-lg transition-shadow"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center text-2xl shrink-0">
                     {category.icon}
                   </div>
@@ -160,6 +197,24 @@ export function CategoriesPage() {
                         Por defecto
                       </span>
                     )}
+                    {!category.isDefault && (
+                      <div className="flex items-center gap-2 mt-3">
+                        <button
+                          onClick={() => handleEdit(category)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(category)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg hover:bg-destructive/20 transition-colors text-sm"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Eliminar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -167,6 +222,43 @@ export function CategoriesPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de Confirmación de Eliminación */}
+      {deletingCategory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-6 z-50">
+          <div className="bg-card p-6 rounded-xl shadow-xl border border-border max-w-md w-full">
+            <h2 className="text-foreground mb-4">¿Eliminar categoría?</h2>
+
+            {getCategoryUsageCount(deletingCategory.id) > 0 ? (
+              <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                <p className="text-foreground text-sm">
+                  Esta categoría está en uso en {getCategoryUsageCount(deletingCategory.id)} transacción(es).
+                  Las transacciones se moverán a la categoría "Sin categoría".
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground mb-4">
+                ¿Estás seguro de que deseas eliminar la categoría "{deletingCategory.name}"?
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDelete}
+                className="flex-1 bg-destructive text-destructive-foreground py-3 rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Eliminar
+              </button>
+              <button
+                onClick={() => setDeletingCategory(null)}
+                className="px-6 py-3 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

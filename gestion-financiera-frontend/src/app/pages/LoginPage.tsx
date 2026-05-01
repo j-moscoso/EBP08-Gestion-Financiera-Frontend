@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { LogIn, Mail, Lock, Wallet, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
+import logo from '../../imports/Logo_login.png';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -52,9 +53,11 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo y Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl">
-            <Wallet className="w-10 h-10 text-primary-foreground" />
-          </div>
+          <img
+            src={logo}
+            alt="Logo"
+            className="w-20 h-20 object-contain mx-auto mb-4"
+          />
           <h1 className="text-foreground mb-2">Gestión Financiera</h1>
           <p className="text-muted-foreground">Ingresa a tu cuenta para continuar</p>
         </div>
@@ -86,9 +89,17 @@ export function LoginPage() {
 
             {/* Contraseña */}
             <div>
-              <label htmlFor="password" className="block text-foreground mb-2">
-                Contraseña
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="password" className="block text-foreground">
+                  Contraseña
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-primary hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
