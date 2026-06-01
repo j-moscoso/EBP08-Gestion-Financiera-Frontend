@@ -4,7 +4,9 @@ import type { Transaction, Category } from '../types';
 import { toast } from 'sonner';
 
 interface TransactionFormProps {
-  onAddTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  onAddTransaction: (
+    transaction: Omit<Transaction, 'id'>,
+  ) => void | Promise<void>;
   categories: Category[];
   onClose?: () => void;
 }
@@ -26,25 +28,34 @@ export function TransactionForm({ onAddTransaction, categories, onClose }: Trans
       return;
     }
 
-    onAddTransaction({
-      description,
-      amount: parseFloat(amount),
-      type,
-      categoryId: finalCategoryId,
-      date: new Date().toISOString(),
-    });
+    void (async () => {
+      try {
+        await Promise.resolve(
+          onAddTransaction({
+            description,
+            amount: parseFloat(amount),
+            type,
+            categoryId: finalCategoryId,
+            date: (() => {
+              const d = new Date();
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            })(),
+          }),
+        );
 
-    toast.success(`${type === 'income' ? 'Ingreso' : 'Gasto'} agregado exitosamente`);
+        toast.success(`${type === 'income' ? 'Ingreso' : 'Gasto'} agregado exitosamente`);
 
-    // Reset form
-    setDescription('');
-    setAmount('');
-    setType('expense');
-    setCategoryId('');
-
-    if (onClose) {
-      onClose();
-    }
+        setDescription('');
+        setAmount('');
+        setType('expense');
+        setCategoryId('');
+        if (onClose) onClose();
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'No se pudo registrar la transacción',
+        );
+      }
+    })();
   };
 
   // Mostrar todas las categorías (son de uso general)

@@ -20,19 +20,27 @@ export function CategoriesPage() {
       return;
     }
 
-    if (editingCategory) {
-      updateCategory(editingCategory.id, { name, icon });
-      toast.success('Información actualizada');
-      setEditingCategory(null);
-    } else {
-      addCategory({ name, icon });
-      toast.success('Categoría creada exitosamente');
-    }
-
-    // Reset form
-    setName('');
-    setIcon('📁');
-    setShowForm(false);
+    void (async () => {
+      try {
+        if (editingCategory) {
+          await updateCategory(editingCategory.id, {
+            name,
+            icon,
+            descripcionBackend: editingCategory.descripcionBackend ?? name,
+          });
+          toast.success('Información actualizada');
+          setEditingCategory(null);
+        } else {
+          await addCategory({ name, icon });
+          toast.success('Categoría creada exitosamente');
+        }
+        setName('');
+        setIcon('📁');
+        setShowForm(false);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'No se pudo guardar la categoría');
+      }
+    })();
   };
 
   const handleEdit = (category: Category) => {
@@ -49,9 +57,15 @@ export function CategoriesPage() {
   const confirmDelete = () => {
     if (!deletingCategory) return;
 
-    deleteCategory(deletingCategory.id);
-    toast.success('Categoría eliminada');
-    setDeletingCategory(null);
+    void (async () => {
+      try {
+        await deleteCategory(deletingCategory.id);
+        toast.success('Categoría eliminada');
+        setDeletingCategory(null);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'No se pudo eliminar la categoría');
+      }
+    })();
   };
 
   const getCategoryUsageCount = (categoryId: string) => {
@@ -197,7 +211,7 @@ export function CategoriesPage() {
                         Por defecto
                       </span>
                     )}
-                    {!category.isDefault && (
+                    {!category.readonly && (
                       <div className="flex items-center gap-2 mt-3">
                         <button
                           onClick={() => handleEdit(category)}
@@ -233,7 +247,7 @@ export function CategoriesPage() {
               <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
                 <p className="text-foreground text-sm">
                   Esta categoría está en uso en {getCategoryUsageCount(deletingCategory.id)} transacción(es).
-                  Las transacciones se moverán a la categoría "Sin categoría".
+                  Las transacciones se moverán a la categoría global OTROS.
                 </p>
               </div>
             ) : (

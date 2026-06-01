@@ -1,7 +1,9 @@
 import { Outlet, useNavigate, useLocation, Link } from 'react-router';
-import { LogOut, Wallet, LayoutDashboard, Target, FolderOpen, Menu, X, TrendingUp, TrendingDown, User } from 'lucide-react';
+import { LogOut, LayoutDashboard, Target, FolderOpen, Menu, X, TrendingUp, TrendingDown, User, Lightbulb, FileText } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import * as api from '../services/api';
 import { useState, useEffect } from 'react';
+import { AppLogo } from '../components/AppLogo';
 
 export function DashboardLayout() {
   const navigate = useNavigate();
@@ -21,8 +23,12 @@ export function DashboardLayout() {
   }
 
   const handleLogout = () => {
-    setUser(null);
-    navigate('/login');
+    void (async () => {
+      await api.logoutUsuarioRemoto().catch(() => undefined);
+      api.clearAuth();
+      setUser(null);
+      navigate('/login');
+    })();
   };
 
   const navItems = [
@@ -31,6 +37,8 @@ export function DashboardLayout() {
     { path: '/incomes', label: 'Ingresos', icon: TrendingUp },
     { path: '/expenses', label: 'Gastos', icon: TrendingDown },
     { path: '/categories', label: 'Categorías', icon: FolderOpen },
+    { path: '/recommendations', label: 'Recomendaciones', icon: Lightbulb },
+    { path: '/reports', label: 'Reportes', icon: FileText },
     { path: '/profile', label: 'Perfil', icon: User },
   ];
 
@@ -44,36 +52,31 @@ export function DashboardLayout() {
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-16 gap-4">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-md">
-                <Wallet className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="text-foreground">Gestión Financiera</h2>
-                <p className="text-muted-foreground text-xs hidden sm:block">
-                  Bienvenido, {user.name}
-                </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <AppLogo className="h-10 w-auto" />
+              <div className="hidden lg:block">
+                <h2 className="text-foreground text-sm whitespace-nowrap">Bienvenido, {user.name}</h2>
               </div>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-2">
+            <nav className="hidden md:flex items-center gap-1 flex-1 justify-end">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                       isActive(item.path)
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
                     <Icon className="w-5 h-5" />
-                    <span>{item.label}</span>
+                    <span className="text-sm">{item.label}</span>
                   </Link>
                 );
               })}
@@ -81,12 +84,9 @@ export function DashboardLayout() {
 
             {/* User Actions */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleLogout}
-                className="hidden sm:flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-              >
+              <button onClick={handleLogout} className="hidden lg:flex items-center gap-2 px-3 py-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors">
                 <LogOut className="w-5 h-5" />
-                <span>Cerrar sesión</span>
+                <span className="text-sm">Cerrar sesión</span>
               </button>
 
               {/* Mobile Menu Button */}

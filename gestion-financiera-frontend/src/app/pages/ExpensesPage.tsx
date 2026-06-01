@@ -3,6 +3,7 @@ import { Plus, TrendingDown, Calendar, Pencil, Trash2, ChevronLeft, ChevronRight
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 import type { ScheduledTransaction } from '../types';
+import { compareYmdDesc, formatYmdLocal, parseYmdLocal } from '../lib/calendarDate';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -26,16 +27,17 @@ export function ExpensesPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const scheduledExpenses = scheduledTransactions.filter(t => t.type === 'expense');
-  const recentExpenses = transactions.filter(t => t.type === 'expense').sort((a, b) =>
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const recentExpenses = transactions
+    .filter((t) => t.type === 'expense')
+    .sort((a, b) => compareYmdDesc(a.date, b.date));
 
-  const filteredExpenses = dateFilter.start && dateFilter.end
-    ? recentExpenses.filter(expense => {
-        const expenseDate = new Date(expense.date);
-        return expenseDate >= new Date(dateFilter.start) && expenseDate <= new Date(dateFilter.end);
-      })
-    : recentExpenses;
+  const filteredExpenses =
+    dateFilter.start && dateFilter.end
+      ? recentExpenses.filter(
+          (expense) =>
+            expense.date >= dateFilter.start && expense.date <= dateFilter.end,
+        )
+      : recentExpenses;
 
   const totalPages = Math.ceil(filteredExpenses.length / ITEMS_PER_PAGE);
   const paginatedExpenses = filteredExpenses.slice(
@@ -53,7 +55,7 @@ export function ExpensesPage() {
     if (!categoryId) newErrors.categoryId = 'Selecciona una categoría';
     if (!startDate) newErrors.startDate = 'Este campo es requerido';
     if (!endDate) newErrors.endDate = 'Este campo es requerido';
-    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+    if (startDate && endDate && parseYmdLocal(startDate) > parseYmdLocal(endDate)) {
       newErrors.endDate = 'La fecha final debe ser posterior a la inicial';
     }
 
@@ -72,16 +74,23 @@ export function ExpensesPage() {
       frequency,
     };
 
-    if (editingExpense) {
-      updateScheduledTransaction(editingExpense.id, expenseData);
-      toast.success('Gasto programado actualizado');
-      setEditingExpense(null);
-    } else {
-      addScheduledTransaction(expenseData);
-      toast.success('Gasto programado creado. Se aplicará automáticamente en las fechas programadas.');
-    }
-
-    resetForm();
+    void (async () => {
+      try {
+        if (editingExpense) {
+          await updateScheduledTransaction(editingExpense.id, expenseData);
+          toast.success('Gasto programado actualizado');
+          setEditingExpense(null);
+        } else {
+          await addScheduledTransaction(expenseData);
+          toast.success(
+            'Gasto programado creado. Se aplicará automáticamente en las fechas programadas.',
+          );
+        }
+        resetForm();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'No se pudo guardar el gasto programado');
+      }
+    })();
   };
 
   const resetForm = () => {
@@ -108,9 +117,16 @@ export function ExpensesPage() {
 
   const confirmDelete = () => {
     if (!deletingExpense) return;
-    deleteScheduledTransaction(deletingExpense.id);
-    toast.success('Gasto programado eliminado');
-    setDeletingExpense(null);
+
+    void (async () => {
+      try {
+        await deleteScheduledTransaction(deletingExpense.id);
+        toast.success('Gasto programado eliminado');
+        setDeletingExpense(null);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
+      }
+    })();
   };
 
   const formatCurrency = (amount: number) => {
@@ -122,13 +138,12 @@ export function ExpensesPage() {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
+  const formatDate = (dateString: string) =>
+    formatYmdLocal(dateString, 'es-CO', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-  };
 
   const getFrequencyLabel = (freq: string) => {
     const labels = {

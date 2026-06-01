@@ -1,361 +1,423 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
-import type { Transaction, Category, Budget, User, ScheduledTransaction, PasswordResetToken } from '../types';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
+import type { Transaction, Category, Budget, User, ScheduledTransaction } from '../types';
+import type {
+  BackendCategoria,
+  BackendTransaccion,
+  BackendTransaccionProgramada,
+  FrecuenciaTransaccionApi,
+  ResumenPresupuestoCategoria,
+  ResumenPresupuestoGlobal,
+  TipoTransaccionApi,
+} from '../services/api';
+import * as api from '../services/api';
+import { apiDateToLocalYmd } from '../lib/calendarDate';
 
-interface RegisteredUser {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
+const ICON_FALLBACK = ['📁', '💼', '🏠', '🍔', '💳', '🎯', '📌', '🧾'];
+
+function toNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const n = Number(value.replace(/\s/g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function pickIconForName(name: string): string {
+  const hash = [...name].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return ICON_FALLBACK[hash % ICON_FALLBACK.length] ?? '📁';
+}
+
+function mapBackendCategory(c: BackendCategoria): Category {
+  const isGlobal = c.usuario == null;
+  const isDefaultCat = c.nombre.trim().toUpperCase() === 'OTROS';
+  return {
+    id: String(c.id),
+    name: c.nombre,
+    descripcionBackend: c.descripcion,
+    icon: isGlobal ? '🌐' : pickIconForName(c.nombre),
+    isDefault: isDefaultCat,
+    readonly: isGlobal,
+  };
+}
+
+function mapBackendTransaction(tx: BackendTransaccion): Transaction {
+  const dateSlice = apiDateToLocalYmd(tx.fecha ?? null);
+  const categoryId =
+    tx.categoria?.id !== undefined ? String(tx.categoria.id) : '';
+
+  const kind: Transaction['type'] =
+    tx.tipo === 'INGRESO' ? 'income' : 'expense';
+
+  return {
+    id: String(tx.id),
+    description: tx.descripcion?.trim() || '—',
+    amount: toNumber(tx.monto),
+    type: kind,
+    categoryId,
+    date: dateSlice,
+  };
+}
+
+function mapFrequencyToFrontend(
+  f: FrecuenciaTransaccionApi,
+): ScheduledTransaction['frequency'] {
+  switch (f) {
+    case 'DIARIA':
+      return 'daily';
+    case 'SEMANAL':
+      return 'weekly';
+    case 'MENSUAL':
+    default:
+      return 'monthly';
+  }
+}
+
+function mapFrequencyToApi(
+  f: ScheduledTransaction['frequency'],
+): FrecuenciaTransaccionApi {
+  switch (f) {
+    case 'daily':
+      return 'DIARIA';
+    case 'weekly':
+      return 'SEMANAL';
+    case 'yearly':
+    case 'monthly':
+    default:
+      return 'MENSUAL';
+  }
+}
+
+function mapScheduledFromApi(p: BackendTransaccionProgramada): ScheduledTransaction {
+  const start = p.fechaInicio ? apiDateToLocalYmd(p.fechaInicio) : '';
+  const fin = p.fechaFin ? apiDateToLocalYmd(p.fechaFin) : start;
+  return {
+    id: String(p.id),
+    description: p.descripcion?.trim() || '—',
+    amount: toNumber(p.monto),
+    type: p.tipo === 'INGRESO' ? 'income' : 'expense',
+    categoryId: String(p.categoria?.id ?? ''),
+    startDate: start,
+    endDate: fin,
+    frequency: mapFrequencyToFrontend(p.frecuencia),
+  };
+}
+
+function buildBudgetsFromApi(
+  global: ResumenPresupuestoGlobal,
+  categorias: ResumenPresupuestoCategoria[],
+): Budget[] {
+  const list: Budget[] = [];
+
+  const msgGlobal = global.mensaje?.trim();
+
+  if (global.presupuestoDefinido && global.montoLimite != null && global.fechaLimite) {
+    const monthSlice = apiDateToLocalYmd(global.fechaLimite).slice(0, 7);
+    list.push({
+      id: `global-${monthSlice}`,
+      name: 'Presupuesto mensual global',
+      amount: toNumber(global.montoLimite),
+      spent: toNumber(global.gastado),
+      categoryId: undefined,
+      month: monthSlice,
+      description: msgGlobal || undefined,
+    });
+  }
+
+  for (const row of categorias) {
+    if (!row.fechaLimite) continue;
+    const monthSlice = apiDateToLocalYmd(row.fechaLimite).slice(0, 7);
+    list.push({
+      id: `cat-${row.idCategoria}-${monthSlice}`,
+      name: `${row.nombreCategoria}`,
+      amount: toNumber(row.montoLimite),
+      spent: toNumber(row.gastado),
+      categoryId: String(row.idCategoria),
+      month: monthSlice,
+    });
+  }
+
+  return list;
+}
+
+function mapUsuarioRegistro(u: api.BackendUsuario): User {
+  return {
+    id: String(u.id),
+    name: u.nombre,
+    email: u.correo,
+  };
+}
+
+function userFromJwtAndStored(jwtCorreo: string): User {
+  const stored = api.getStoredUser();
+  const emailNorm = jwtCorreo.trim().toLowerCase();
+  if (stored && stored.email.trim().toLowerCase() === emailNorm) {
+    return { id: stored.id, name: stored.name, email: stored.email };
+  }
+  const local = jwtCorreo.split('@')[0] || jwtCorreo;
+  const pretty = local.length > 0 ? local.charAt(0).toUpperCase() + local.slice(1) : jwtCorreo;
+
+  return { id: '0', name: pretty, email: jwtCorreo };
 }
 
 interface AppContextType {
   user: User | null;
   setUser: (user: User | null) => void;
-  registeredUsers: RegisteredUser[];
-  registerUser: (user: RegisteredUser) => void;
-  validateLogin: (email: string, password: string) => User | null;
-  changePassword: (email: string, oldPassword: string, newPassword: string) => boolean;
+  registerAndSignIn: (name: string, email: string, password: string) => Promise<User>;
+  validateLogin: (email: string, password: string) => Promise<User | null>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
   sendPasswordResetEmail: (email: string) => boolean;
   resetPassword: (token: string, newPassword: string) => boolean;
   transactions: Transaction[];
   setTransactions: (transactions: Transaction[]) => void;
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
   scheduledTransactions: ScheduledTransaction[];
   setScheduledTransactions: (transactions: ScheduledTransaction[]) => void;
-  addScheduledTransaction: (transaction: Omit<ScheduledTransaction, 'id'>) => void;
-  updateScheduledTransaction: (id: string, transaction: Partial<ScheduledTransaction>) => void;
-  deleteScheduledTransaction: (id: string) => void;
+  addScheduledTransaction: (transaction: Omit<ScheduledTransaction, 'id'>) => Promise<void>;
+  updateScheduledTransaction: (
+    id: string,
+    transaction: Partial<ScheduledTransaction>,
+  ) => Promise<void>;
+  deleteScheduledTransaction: (id: string) => Promise<void>;
   categories: Category[];
   setCategories: (categories: Category[]) => void;
-  addCategory: (category: Omit<Category, 'id'>) => void;
-  updateCategory: (id: string, category: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
+  addCategory: (category: Omit<Category, 'id'>) => Promise<void>;
+  updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
   budgets: Budget[];
   setBudgets: (budgets: Budget[]) => void;
-  addBudget: (budget: Omit<Budget, 'id'>) => void;
+  /** Último resumen global del API (sirve sobre todo para `mensaje` cuando no hay presupuesto definido). */
+  resumenPresupuestoGlobal: ResumenPresupuestoGlobal | null;
+  addBudget: (budget: Omit<Budget, 'id'>) => Promise<void>;
   updateBudget: (id: string, budget: Partial<Budget>) => void;
+  refreshFromBackend: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+function readStoredSessionUser(): User | null {
+  const tok = api.getToken();
+  const saved = api.getStoredUser();
+  if (!tok || !saved) return null;
+  return { id: saved.id, name: saved.name, email: saved.email };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => readStoredSessionUser());
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [scheduledTransactions, setScheduledTransactions] = useState<ScheduledTransaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [resumenPresupuestoGlobal, setResumenPresupuestoGlobal] =
+    useState<ResumenPresupuestoGlobal | null>(null);
 
-  // Usuario de muestra
-  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([
-    {
-      id: '1',
-      name: 'María García',
-      email: 'maria@ejemplo.com',
-      password: '12345678'
+  const syncFromBackend = useCallback(async () => {
+    if (!api.getToken()) return;
+
+    const [rawCats, rawTx, globalRes, catsB, incP, egP] = await Promise.all([
+      api.listarCategoriasUsuario(),
+      api.listarTransaccionesUsuario(),
+      api.obtenerResumenPresupuestoGlobal(),
+      api.obtenerResumenPresupuestosCategoria(),
+      api.listarIngresosProgramadosApi(),
+      api.listarEgresosProgramadosApi(),
+    ]);
+
+    setCategories(rawCats.map(mapBackendCategory));
+
+    rawTx.sort((a, b) => {
+      const da = String(a.fecha ?? '');
+      const db = String(b.fecha ?? '');
+      return db.localeCompare(da);
+    });
+    setTransactions(rawTx.map(mapBackendTransaction));
+    setResumenPresupuestoGlobal(globalRes);
+    setBudgets(buildBudgetsFromApi(globalRes, catsB));
+
+    const combined = [...incP, ...egP].map(mapScheduledFromApi);
+    setScheduledTransactions(combined);
+  }, []);
+
+  const refreshFromBackend = useCallback(async () => {
+    try {
+      await syncFromBackend();
+    } catch {
+      throw new Error('No se pudieron cargar los datos del servidor.');
     }
-  ]);
+  }, [syncFromBackend]);
 
-  const [passwordResetTokens, setPasswordResetTokens] = useState<PasswordResetToken[]>([]);
+  useEffect(() => {
+    if (!user || !api.getToken()) return;
+    syncFromBackend().catch(() => {
+      /** Error de red: no cerramos sesión automáticamente; el usuario puede reintentar al navegar */
+    });
+  }, [user, syncFromBackend]);
 
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Sin categoría', icon: '📋', isDefault: true },
-    { id: '2', name: 'Alimentación', icon: '🍔' },
-    { id: '3', name: 'Transporte', icon: '🚗' },
-    { id: '4', name: 'Salud', icon: '⚕️' },
-    { id: '5', name: 'Entretenimiento', icon: '🎬' },
-    { id: '6', name: 'Educación', icon: '📚' },
-    { id: '7', name: 'Vivienda', icon: '🏠' },
-    { id: '8', name: 'Servicios', icon: '💡' },
-    { id: '9', name: 'Gimnasio', icon: '🏋️' },
-    { id: '10', name: 'Ropa', icon: '👔' },
-    { id: '11', name: 'Salario', icon: '💰' },
-    { id: '12', name: 'Freelance', icon: '💻' },
-  ]);
+  const txToTipo = (kind: Transaction['type']): TipoTransaccionApi =>
+    kind === 'income' ? 'INGRESO' : 'EGRESO';
 
-  const currentDate = new Date();
-  const currentMonth = currentDate.toISOString().slice(0, 7);
-  const currentYear = currentDate.getFullYear();
-  const currentMonthNum = currentDate.getMonth();
+  const addTransaction = async (payload: Omit<Transaction, 'id'>) => {
+    const cid = payload.categoryId ? Number(payload.categoryId) : undefined;
 
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    // Ingresos del mes actual
-    { id: '101', description: 'Salario mensual', amount: 3500000, type: 'income', categoryId: '11', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-01` },
-    { id: '102', description: 'Proyecto freelance web', amount: 1200000, type: 'income', categoryId: '12', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-15` },
-    { id: '103', description: 'Consultoría', amount: 800000, type: 'income', categoryId: '12', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-08` },
-
-    // Gastos del mes actual
-    { id: '201', description: 'Arriendo apartamento', amount: 1200000, type: 'expense', categoryId: '7', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-05` },
-    { id: '202', description: 'Mercado del mes', amount: 450000, type: 'expense', categoryId: '2', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-03` },
-    { id: '203', description: 'Gasolina', amount: 180000, type: 'expense', categoryId: '3', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-07` },
-    { id: '204', description: 'Mensualidad gimnasio', amount: 100000, type: 'expense', categoryId: '9', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-02` },
-    { id: '205', description: 'Cine y cena', amount: 85000, type: 'expense', categoryId: '5', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-12` },
-    { id: '206', description: 'Servicios públicos', amount: 320000, type: 'expense', categoryId: '8', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-10` },
-    { id: '207', description: 'Internet y celular', amount: 120000, type: 'expense', categoryId: '8', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-11` },
-    { id: '208', description: 'Restaurante', amount: 95000, type: 'expense', categoryId: '2', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-14` },
-    { id: '209', description: 'Uber', amount: 45000, type: 'expense', categoryId: '3', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-16` },
-    { id: '210', description: 'Farmacia', amount: 65000, type: 'expense', categoryId: '4', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-09` },
-    { id: '211', description: 'Netflix y Spotify', amount: 48000, type: 'expense', categoryId: '5', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-13` },
-    { id: '212', description: 'Curso online', amount: 250000, type: 'expense', categoryId: '6', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-06` },
-    { id: '213', description: 'Supermercado', amount: 180000, type: 'expense', categoryId: '2', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-17` },
-    { id: '214', description: 'Camisa nueva', amount: 120000, type: 'expense', categoryId: '10', date: `${currentYear}-${String(currentMonthNum + 1).padStart(2, '0')}-04` },
-  ]);
-
-  const [scheduledTransactions, setScheduledTransactions] = useState<ScheduledTransaction[]>([
-    // Ingresos programados
-    {
-      id: 's101',
-      description: 'Salario mensual',
-      amount: 3500000,
-      type: 'income',
-      categoryId: '11',
-      startDate: '2026-01-01',
-      endDate: '2026-12-31',
-      frequency: 'monthly'
-    },
-    {
-      id: 's102',
-      description: 'Consultoría recurrente',
-      amount: 800000,
-      type: 'income',
-      categoryId: '12',
-      startDate: '2026-01-01',
-      endDate: '2026-06-30',
-      frequency: 'monthly'
-    },
-
-    // Gastos programados
-    {
-      id: 's201',
-      description: 'Arriendo apartamento',
-      amount: 1200000,
-      type: 'expense',
-      categoryId: '7',
-      startDate: '2026-01-01',
-      endDate: '2026-12-31',
-      frequency: 'monthly'
-    },
-    {
-      id: 's202',
-      description: 'Mensualidad gimnasio',
-      amount: 100000,
-      type: 'expense',
-      categoryId: '9',
-      startDate: '2026-01-01',
-      endDate: '2026-12-31',
-      frequency: 'monthly'
-    },
-    {
-      id: 's203',
-      description: 'Internet y celular',
-      amount: 120000,
-      type: 'expense',
-      categoryId: '8',
-      startDate: '2026-01-01',
-      endDate: '2026-12-31',
-      frequency: 'monthly'
-    },
-    {
-      id: 's204',
-      description: 'Netflix y Spotify',
-      amount: 48000,
-      type: 'expense',
-      categoryId: '5',
-      startDate: '2026-01-01',
-      endDate: '2026-12-31',
-      frequency: 'monthly'
-    },
-  ]);
-
-  const [budgets, setBudgets] = useState<Budget[]>([
-    // Presupuesto global
-    {
-      id: 'b1',
-      name: 'Presupuesto Mensual General',
-      amount: 4500000,
-      spent: 3378000,
-      month: currentMonth
-    },
-
-    // Presupuestos por categoría con diferentes porcentajes
-    {
-      id: 'b2',
-      name: 'Presupuesto Alimentación',
-      amount: 800000,
-      spent: 725000,
-      categoryId: '2',
-      month: currentMonth
-    },
-    {
-      id: 'b3',
-      name: 'Presupuesto Transporte',
-      amount: 300000,
-      spent: 225000,
-      categoryId: '3',
-      month: currentMonth
-    },
-    {
-      id: 'b4',
-      name: 'Presupuesto Entretenimiento',
-      amount: 200000,
-      spent: 228000,
-      categoryId: '5',
-      month: currentMonth
-    },
-    {
-      id: 'b5',
-      name: 'Presupuesto Vivienda',
-      amount: 1500000,
-      spent: 1200000,
-      categoryId: '7',
-      month: currentMonth
-    },
-    {
-      id: 'b6',
-      name: 'Presupuesto Servicios',
-      amount: 500000,
-      spent: 440000,
-      categoryId: '8',
-      month: currentMonth
-    },
-    {
-      id: 'b7',
-      name: 'Presupuesto Educación',
-      amount: 300000,
-      spent: 250000,
-      categoryId: '6',
-      month: currentMonth
-    },
-  ]);
-
-  const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
-    const newTransaction: Transaction = {
-      ...transaction,
-      id: Date.now().toString(),
-    };
-    setTransactions([newTransaction, ...transactions]);
+    await api.crearTransaccion({
+      idCategoria:
+        cid !== undefined &&
+        cid !== null &&
+        !Number.isNaN(cid) &&
+        payload.categoryId !== ''
+          ? cid
+          : undefined,
+      tipo: txToTipo(payload.type),
+      monto: payload.amount,
+      descripcion: payload.description,
+    });
+    await syncFromBackend().catch(() => undefined);
   };
 
-  const addScheduledTransaction = (transaction: Omit<ScheduledTransaction, 'id'>) => {
-    const newTransaction: ScheduledTransaction = {
-      ...transaction,
-      id: Date.now().toString(),
-    };
-    setScheduledTransactions([...scheduledTransactions, newTransaction]);
+  const registerAndSignIn = async (
+    name: string,
+    email: string,
+    password: string,
+  ): Promise<User> => {
+    const created = await api.registerUsuario(name.trim(), email.trim(), password);
+    const token = await api.loginUsuario(email.trim(), password);
+    api.saveAuthToken(token);
+
+    const appUser = mapUsuarioRegistro(created);
+    api.saveUser({
+      id: appUser.id,
+      name: appUser.name,
+      email: appUser.email,
+    });
+    // Guardar usuario en estado; la sincronización con el backend
+    // se realiza desde el efecto `useEffect` que escucha `user`.
+    setUser(appUser);
+    return appUser;
   };
 
-  const updateScheduledTransaction = (id: string, transactionUpdate: Partial<ScheduledTransaction>) => {
-    setScheduledTransactions(scheduledTransactions.map(t => t.id === id ? { ...t, ...transactionUpdate } : t));
-  };
-
-  const deleteScheduledTransaction = (id: string) => {
-    setScheduledTransactions(scheduledTransactions.filter(t => t.id !== id));
-  };
-
-  const addCategory = (category: Omit<Category, 'id'>) => {
-    const newCategory: Category = {
-      ...category,
-      id: Date.now().toString(),
-    };
-    setCategories([...categories, newCategory]);
-  };
-
-  const updateCategory = (id: string, categoryUpdate: Partial<Category>) => {
-    setCategories(categories.map(c => c.id === id ? { ...c, ...categoryUpdate } : c));
-  };
-
-  const deleteCategory = (id: string) => {
-    // Mover transacciones a categoría por defecto
-    const defaultCategory = categories.find(c => c.isDefault);
-    if (defaultCategory) {
-      setTransactions(transactions.map(t =>
-        t.categoryId === id ? { ...t, categoryId: defaultCategory.id } : t
-      ));
-      setScheduledTransactions(scheduledTransactions.map(t =>
-        t.categoryId === id ? { ...t, categoryId: defaultCategory.id } : t
-      ));
+  const validateLogin = async (
+    email: string,
+    password: string,
+  ): Promise<User | null> => {
+    const token = await api.loginUsuario(email.trim(), password);
+    api.saveAuthToken(token);
+    const sub = api.decodeJwtSubject(token);
+    if (!sub) {
+      api.clearAuth();
+      return null;
     }
-    setCategories(categories.filter(c => c.id !== id));
+    const appUser = userFromJwtAndStored(sub);
+    api.saveUser({
+      id: appUser.id,
+      name: appUser.name,
+      email: appUser.email,
+    });
+    // Guardar usuario en estado; `syncFromBackend` será lanzado
+    // automáticamente por el efecto que escucha cambios en `user`.
+    setUser(appUser);
+    return appUser;
   };
 
-  const addBudget = (budget: Omit<Budget, 'id'>) => {
-    const newBudget: Budget = {
-      ...budget,
-      id: Date.now().toString(),
-    };
-    setBudgets([...budgets, newBudget]);
-  };
-
-  const updateBudget = (id: string, budgetUpdate: Partial<Budget>) => {
-    setBudgets(budgets.map(b => b.id === id ? { ...b, ...budgetUpdate } : b));
-  };
-
-  const registerUser = (newUser: RegisteredUser) => {
-    setRegisteredUsers([...registeredUsers, newUser]);
-  };
-
-  const validateLogin = (email: string, password: string): User | null => {
-    const foundUser = registeredUsers.find(
-      u => u.email === email && u.password === password
-    );
-
-    if (foundUser) {
-      return {
-        id: foundUser.id,
-        name: foundUser.name,
-        email: foundUser.email,
-      };
-    }
-
-    return null;
-  };
-
-  const changePassword = (email: string, oldPassword: string, newPassword: string): boolean => {
-    const userIndex = registeredUsers.findIndex(
-      u => u.email === email && u.password === oldPassword
-    );
-
-    if (userIndex !== -1) {
-      const updatedUsers = [...registeredUsers];
-      updatedUsers[userIndex] = { ...updatedUsers[userIndex], password: newPassword };
-      setRegisteredUsers(updatedUsers);
+  const changePassword = async (
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<boolean> => {
+    try {
+      await api.actualizarClaveUsuario(oldPassword, newPassword);
       return true;
+    } catch (err) {
+    if (err instanceof Error) {
+      throw new Error(err.message);
     }
-
-    return false;
+    throw new Error('No se pudo actualizar la contraseña. Intenta de nuevo.');
+  }
   };
 
-  const sendPasswordResetEmail = (email: string): boolean => {
-    // Simular envío de correo - siempre retorna true para seguridad
-    const token = Math.random().toString(36).substring(2);
-    const newToken: PasswordResetToken = {
-      email,
-      token,
-      expiresAt: Date.now() + 3600000, // 1 hora
-      used: false,
-    };
-    setPasswordResetTokens([...passwordResetTokens, newToken]);
+  const sendPasswordResetEmail = (_email: string) => {
     return true;
   };
 
-  const resetPassword = (token: string, newPassword: string): boolean => {
-    const tokenIndex = passwordResetTokens.findIndex(
-      t => t.token === token && !t.used && t.expiresAt > Date.now()
-    );
-
-    if (tokenIndex !== -1) {
-      const resetToken = passwordResetTokens[tokenIndex];
-      const userIndex = registeredUsers.findIndex(u => u.email === resetToken.email);
-
-      if (userIndex !== -1) {
-        const updatedUsers = [...registeredUsers];
-        updatedUsers[userIndex] = { ...updatedUsers[userIndex], password: newPassword };
-        setRegisteredUsers(updatedUsers);
-
-        const updatedTokens = [...passwordResetTokens];
-        updatedTokens[tokenIndex] = { ...updatedTokens[tokenIndex], used: true };
-        setPasswordResetTokens(updatedTokens);
-
-        return true;
-      }
-    }
-
+  const resetPassword = (_token: string, _newPassword: string) => {
     return false;
+  };
+
+  const addScheduledTransaction = async (t: Omit<ScheduledTransaction, 'id'>) => {
+    const tipo: TipoTransaccionApi = t.type === 'income' ? 'INGRESO' : 'EGRESO';
+    await api.crearTransaccionProgramada({
+      monto: String(t.amount),
+      descripcion: t.description,
+      fechaInicio: t.startDate,
+      fechaFin: t.endDate || null,
+      frecuencia: mapFrequencyToApi(t.frequency),
+      tipo,
+      idCategoria: Number(t.categoryId),
+    });
+    await syncFromBackend().catch(() => undefined);
+  };
+
+  const updateScheduledTransaction = async (
+    id: string,
+    partial: Partial<ScheduledTransaction>,
+  ) => {
+    const body: Parameters<typeof api.actualizarTransaccionProgramada>[1] = {};
+    if (partial.amount !== undefined) body.monto = String(partial.amount);
+    if (partial.description !== undefined) body.descripcion = partial.description;
+    if (partial.startDate !== undefined) body.fechaInicio = partial.startDate;
+    if (partial.endDate !== undefined) body.fechaFin = partial.endDate || null;
+    if (partial.frequency !== undefined) body.frecuencia = mapFrequencyToApi(partial.frequency);
+
+    await api.actualizarTransaccionProgramada(Number(id), body);
+    await syncFromBackend().catch(() => undefined);
+  };
+
+  const deleteScheduledTransaction = async (id: string) => {
+    await api.eliminarTransaccionProgramada(Number(id));
+    await syncFromBackend().catch(() => undefined);
+  };
+
+  const addCategory = async (category: Omit<Category, 'id'>) => {
+    const desc = category.name.trim();
+    await api.crearCategoria(category.name.trim(), category.descripcionBackend || desc);
+    await syncFromBackend();
+  };
+
+  const updateCategory = async (id: string, fields: Partial<Category>) => {
+    const existing = categories.find((c) => c.id === id);
+    const cid = Number(id);
+    const name = (fields.name ?? existing?.name ?? '').trim();
+    if (!name) throw new Error('Nombre inválido');
+    const descripcion =
+      (fields.descripcionBackend ?? existing?.descripcionBackend ?? name).trim() || name;
+    await api.actualizarCategoriaPropia(cid, name, descripcion);
+    await syncFromBackend().catch(() => undefined);
+  };
+
+  const deleteCategory = async (id: string) => {
+    await api.eliminarCategoriaPropia(Number(id));
+    await syncFromBackend().catch(() => undefined);
+  };
+
+  const addBudget = async (budget: Omit<Budget, 'id'>) => {
+    const limit = Number(budget.amount);
+    if (!Number.isFinite(limit) || limit <= 0) throw new Error('Monto inválido');
+
+    if (budget.categoryId) {
+      await api.crearPresupuestoCategoriaApi(Number(budget.categoryId), limit);
+    } else {
+      await api.crearPresupuestoGlobalApi(limit);
+    }
+    await syncFromBackend().catch(() => undefined);
+  };
+
+  const updateBudget = (id: string, budgetUpdate: Partial<Budget>) => {
+    setBudgets((budgets) => budgets.map((b) => (b.id === id ? { ...b, ...budgetUpdate } : b)));
   };
 
   return (
@@ -363,8 +425,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         setUser,
-        registeredUsers,
-        registerUser,
+        registerAndSignIn,
         validateLogin,
         changePassword,
         sendPasswordResetEmail,
@@ -384,8 +445,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteCategory,
         budgets,
         setBudgets,
+        resumenPresupuestoGlobal,
         addBudget,
         updateBudget,
+        refreshFromBackend,
       }}
     >
       {children}

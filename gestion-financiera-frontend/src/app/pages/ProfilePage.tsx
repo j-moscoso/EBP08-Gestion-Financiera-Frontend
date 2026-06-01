@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 
@@ -13,6 +13,7 @@ export function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [loading, setLoading] = useState(false);
 
   const validatePassword = (password: string) => {
     return password.length >= 8;
@@ -23,7 +24,6 @@ export function ProfilePage() {
 
     const newErrors: { [key: string]: string } = {};
 
-    // Validaciones
     if (!currentPassword) {
       newErrors.currentPassword = 'Este campo es requerido';
     }
@@ -43,20 +43,28 @@ export function ProfilePage() {
       return;
     }
 
-    // Intentar cambiar contraseña
-    if (!user) return;
-
-    const success = changePassword(user.email, currentPassword, newPassword);
-
-    if (success) {
-      toast.success('Contraseña actualizada');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setErrors({});
-    } else {
-      setErrors({ currentPassword: 'Contraseña actual incorrecta' });
-    }
+    setLoading(true);
+    void (async () => {
+      if (!user) return;
+      try {
+        const success = await changePassword(currentPassword, newPassword);
+        if (success) {
+          toast.success('Contraseña actualizada exitosamente');
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setErrors({});
+        } else {
+          setErrors({ currentPassword: 'Contraseña actual incorrecta.' });
+        }
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Error al conectar con el servidor. Intenta de nuevo.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   return (
@@ -203,9 +211,17 @@ export function ProfilePage() {
 
               <button
                 type="submit"
-                className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
+                disabled={loading}
+                className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Actualizar contraseña
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  'Actualizar contraseña'
+                )}
               </button>
             </form>
           </div>

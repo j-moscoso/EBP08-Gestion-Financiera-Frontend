@@ -7,7 +7,7 @@ import logo from '../../imports/Logo_login.png';
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const { user, setUser, registerUser, registeredUsers } = useApp();
+  const { user, registerAndSignIn } = useApp();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,12 +36,6 @@ export function RegisterPage() {
     if (password.length < 6) newErrors.push('La contraseña debe tener al menos 6 caracteres');
     if (password !== confirmPassword) newErrors.push('Las contraseñas no coinciden');
 
-    // Verificar si el email ya está registrado
-    const emailExists = registeredUsers.some(u => u.email === email);
-    if (emailExists) {
-      newErrors.push('Este correo electrónico ya está registrado');
-    }
-
     if (newErrors.length > 0) {
       setErrors(newErrors);
       return;
@@ -49,27 +43,18 @@ export function RegisterPage() {
 
     setLoading(true);
 
-    // Simulación de registro con delay
-    setTimeout(() => {
-      const newUser = {
-        id: Date.now().toString(),
-        name: name,
-        email: email,
-        password: password,
-      };
-
-      registerUser(newUser);
-
-      setUser({
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-      });
-
-      toast.success('¡Cuenta creada exitosamente!');
-      setLoading(false);
-      navigate('/');
-    }, 800);
+    void (async () => {
+      try {
+        await registerAndSignIn(name.trim(), email.trim(), password);
+        toast.success('¡Cuenta creada exitosamente!');
+        navigate('/');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'No se pudo crear la cuenta';
+        setErrors([msg]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   return (

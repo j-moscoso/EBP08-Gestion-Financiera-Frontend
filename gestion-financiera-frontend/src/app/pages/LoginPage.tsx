@@ -3,11 +3,11 @@ import { useNavigate, Link } from 'react-router';
 import { LogIn, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
-import logo from '../../imports/Logo_login.png';
+import { AppLogo } from '../components/AppLogo';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { user, setUser, validateLogin } = useApp();
+  const { user, validateLogin } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,6 +21,7 @@ export function LoginPage() {
     }
   }, [user, navigate]);
 
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -32,20 +33,25 @@ export function LoginPage() {
 
     setLoading(true);
 
-    // Simulación de login con delay
-    setTimeout(() => {
-      const validatedUser = validateLogin(email, password);
-
-      if (validatedUser) {
-        setUser(validatedUser);
+    void (async () => {
+      try {
+        const authenticated = await validateLogin(email, password.trim());
+        if (!authenticated) {
+          setError('No se pudo completar el inicio de sesión.');
+          return;
+        }
         toast.success('¡Bienvenido!');
-        setLoading(false);
         navigate('/');
-      } else {
-        setError('Correo electrónico o contraseña incorrectos. Si no tienes cuenta, regístrate primero.');
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Correo electrónico o contraseña incorrectos. Si no tienes cuenta, regístrate primero.',
+        );
+      } finally {
         setLoading(false);
       }
-    }, 800);
+    })();
   };
 
   return (
@@ -53,11 +59,7 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo y Header */}
         <div className="text-center mb-8">
-          <img
-            src={logo}
-            alt="Logo"
-            className="w-20 h-20 object-contain mx-auto mb-4"
-          />
+          <AppLogo className="h-20 w-auto mx-auto mb-4" />
           <h1 className="text-foreground mb-2">Gestión Financiera</h1>
           <p className="text-muted-foreground">Ingresa a tu cuenta para continuar</p>
         </div>

@@ -10,6 +10,8 @@ import { CategoriesPage } from "./pages/CategoriesPage";
 import { IncomesPage } from "./pages/IncomesPage";
 import { ExpensesPage } from "./pages/ExpensesPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { RecommendationsPage } from "./pages/RecommendationsPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 export const router = createBrowserRouter([
@@ -52,6 +54,14 @@ export const router = createBrowserRouter([
       {
         path: "categories",
         Component: CategoriesPage,
+      },
+      {
+        path: "recommendations",
+        Component: RecommendationsPage,
+      },
+      {
+        path: "reports",
+        Component: ReportsPage,
       },
       {
         path: "profile",
