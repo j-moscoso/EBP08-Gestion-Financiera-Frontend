@@ -21,6 +21,7 @@ export interface ScheduledTransaction {
 export interface Category {
   id: string;
   name: string;
+  description?: string;
   icon: string;
   isDefault?: boolean;
   backendId?: number; // ID del backend para sincronización con la API

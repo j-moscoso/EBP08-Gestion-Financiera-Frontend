@@ -3,7 +3,6 @@ import { Plus, FolderOpen, Pencil, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 import type { Category } from '../types';
-import { createCategory, updateCategory as apiUpdateCategory, deleteCategory as apiDeleteCategory } from '../services/api';
 
 export function CategoriesPage() {
   const { categories, addCategory, updateCategory, deleteCategory, transactions, scheduledTransactions } = useApp();
@@ -11,6 +10,7 @@ export function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('📁');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,41 +21,34 @@ export function CategoriesPage() {
       return;
     }
 
-    // Nombre interno: concatenación de emoji + nombre para que el backend persista el icono
-    const nombreInterno = icon ? `${icon} ${name}` : name;
+    if (!description) {
+      toast.error('Por favor ingresa una descripción para la categoría');
+      return;
+    }
 
     try {
       if (editingCategory) {
-        if (editingCategory.backendId) {
-          await apiUpdateCategory(editingCategory.backendId, nombreInterno, nombreInterno);
-        }
-        updateCategory(editingCategory.id, { name: nombreInterno, icon });
-        toast.success('Información actualizada');
-        setEditingCategory(null);
+        await updateCategory(editingCategory.id, { name, description, icon });
       } else {
-        const backendCategory = await createCategory(nombreInterno, nombreInterno);
-        addCategory({ name: nombreInterno, icon, backendId: backendCategory.id });
-        toast.success('Categoría creada exitosamente');
+        await addCategory({ name, description, icon });
       }
     } catch (error: any) {
       console.error('[CategoriesPage] Error al guardar categoría:', error);
-      toast.error(error.message || 'Error al guardar la categoría');
+      // Error ya manejado en el contexto
     }
 
     // Reset form
     setName('');
+    setDescription('');
     setIcon('📁');
     setShowForm(false);
+    setEditingCategory(null);
   };
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
-    // Si el nombre ya tiene el emoji al inicio, extraer solo el texto base para edición
-    const nameParts = category.name.trimStart();
-    const firstSpaceIdx = nameParts.indexOf(' ');
-    const possibleEmoji = firstSpaceIdx >= 0 ? nameParts.slice(0, firstSpaceIdx) : '';
-    const isEmojiPrefix = possibleEmoji === category.icon && possibleEmoji.length > 0;
-    setName(isEmojiPrefix ? nameParts.slice(firstSpaceIdx + 1).trim() : category.name);
+    setName(category.name);
+    setDescription(category.description || '');
     setIcon(category.icon);
     setShowForm(true);
   };
@@ -133,6 +126,22 @@ export function CategoriesPage() {
               />
             </div>
 
+            {/* Descripción */}
+            <div>
+              <label htmlFor="description" className="block text-foreground mb-2">
+                Descripción
+              </label>
+              <input
+                id="description"
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Ej: Gastos relacionados con el gimnasio"
+                required
+              />
+            </div>
+
             {/* Selector de Icono */}
             <div>
               <label className="block text-foreground mb-2">
@@ -178,6 +187,7 @@ export function CategoriesPage() {
                   setShowForm(false);
                   setEditingCategory(null);
                   setName('');
+                  setDescription('');
                   setIcon('📁');
                 }}
                 className="px-6 py-3 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
@@ -214,6 +224,11 @@ export function CategoriesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-foreground truncate">{category.name}</h3>
+                    {category.description && (
+                      <p className="text-muted-foreground text-sm mt-1 truncate">
+                        {category.description}
+                      </p>
+                    )}
                     {category.isDefault && (
                       <span className="inline-block mt-1 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">
                         Por defecto

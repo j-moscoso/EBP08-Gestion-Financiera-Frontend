@@ -376,7 +376,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const created = await api.createCategory(
         category.name,
-        category.icon // Usamos icon como descripción por ahora
+        category.description || category.name
       );
 
       const newCategory = mapBackendCategory(created);
@@ -398,7 +398,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const updated = await api.updateCategory(
         existing.backendId,
         merged.name,
-        merged.icon
+        merged.description || merged.name
       );
 
       const mappedCategory = mapBackendCategory(updated);
