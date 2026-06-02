@@ -127,6 +127,7 @@ export function IncomesPage() {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      timeZone: 'UTC'
     });
   };
 

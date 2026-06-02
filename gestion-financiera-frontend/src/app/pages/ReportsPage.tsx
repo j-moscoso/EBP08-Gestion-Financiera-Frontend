@@ -97,9 +97,13 @@ export function ReportsPage() {
     const options = [];
     const current = new Date();
     for (let i = 0; i < 12; i++) {
-      const date = new Date(current.getFullYear(), current.getMonth() - i, 1);
+      const date = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - i, 1));
       const value = date.toISOString().slice(0, 7);
-      const label = date.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
+      const label = date.toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'long',
+        timeZone: 'UTC'
+      });
       options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
     }
     return options;

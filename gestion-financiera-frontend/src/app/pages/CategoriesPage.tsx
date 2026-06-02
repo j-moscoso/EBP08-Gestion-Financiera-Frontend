@@ -21,8 +21,8 @@ export function CategoriesPage() {
       return;
     }
 
-    // Nombre interno: concatenación de nombre + emoji para que el backend persista el icono
-    const nombreInterno = icon ? `${name} ${icon}` : name;
+    // Nombre interno: concatenación de emoji + nombre para que el backend persista el icono
+    const nombreInterno = icon ? `${icon} ${name}` : name;
 
     try {
       if (editingCategory) {
@@ -50,12 +50,12 @@ export function CategoriesPage() {
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
-    // Si el nombre ya tiene el emoji al final, extraer solo el texto base para edición
-    const nameParts = category.name.trimEnd();
-    const lastSpaceIdx = nameParts.lastIndexOf(' ');
-    const possibleEmoji = lastSpaceIdx >= 0 ? nameParts.slice(lastSpaceIdx + 1) : '';
-    const isEmojiSuffix = possibleEmoji === category.icon && possibleEmoji.length > 0;
-    setName(isEmojiSuffix ? nameParts.slice(0, lastSpaceIdx) : category.name);
+    // Si el nombre ya tiene el emoji al inicio, extraer solo el texto base para edición
+    const nameParts = category.name.trimStart();
+    const firstSpaceIdx = nameParts.indexOf(' ');
+    const possibleEmoji = firstSpaceIdx >= 0 ? nameParts.slice(0, firstSpaceIdx) : '';
+    const isEmojiPrefix = possibleEmoji === category.icon && possibleEmoji.length > 0;
+    setName(isEmojiPrefix ? nameParts.slice(firstSpaceIdx + 1).trim() : category.name);
     setIcon(category.icon);
     setShowForm(true);
   };

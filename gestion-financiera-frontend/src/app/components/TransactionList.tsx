@@ -48,7 +48,12 @@ const formatCurrency = (amount: number, type: 'income' | 'expense') => {
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  return date.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC'
+  });
 };
 
 // ── Modal de Edición ──────────────────────────────────────────────────────────

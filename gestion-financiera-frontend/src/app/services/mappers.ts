@@ -20,7 +20,24 @@ export function mapBackendUser(backendUser: BackendUser): User {
 }
 
 export function mapBackendCategory(backendCategory: BackendCategory): Category {
-  // Mapeo de iconos por nombre de categoría (igual que en AppContext)
+  // Extraer emoji del nombre si está presente al inicio
+  // Formato esperado del backend: "emoji nombre" (ej: "🏋️ GIMNASIO")
+  const nombreCompleto = backendCategory.nombre;
+  const firstSpaceIdx = nombreCompleto.indexOf(' ');
+
+  let icon = '📋'; // icono por defecto
+  let name = nombreCompleto;
+
+  if (firstSpaceIdx > 0) {
+    const possibleEmoji = nombreCompleto.slice(0, firstSpaceIdx);
+    // Verificar si el primer segmento parece un emoji (longitud corta)
+    if (possibleEmoji.length <= 4) {
+      icon = possibleEmoji;
+      name = nombreCompleto.slice(firstSpaceIdx + 1).trim();
+    }
+  }
+
+  // Mapeo de iconos por nombre para categorías predeterminadas (sin emoji en el nombre)
   const iconMap: Record<string, string> = {
     'Sin categoría': '📋',
     'Alimentación': '🍔',
@@ -36,10 +53,15 @@ export function mapBackendCategory(backendCategory: BackendCategory): Category {
     'Freelance': '💻',
   };
 
+  // Si no se extrajo emoji, buscar en el mapa de predeterminadas
+  if (icon === '📋' && iconMap[nombreCompleto]) {
+    icon = iconMap[nombreCompleto];
+  }
+
   return {
     id: backendCategory.id.toString(),
-    name: backendCategory.nombre,
-    icon: iconMap[backendCategory.nombre] || '📋',
+    name: name,
+    icon: icon,
     isDefault: backendCategory.usuario === null,
     backendId: backendCategory.id,
   };
