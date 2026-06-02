@@ -1,6 +1,5 @@
 import { TrendingUp, TrendingDown, Calendar, Sparkles } from 'lucide-react';
 import type { Transaction } from '../types';
-import { parseYmdLocal } from '../lib/calendarDate';
 
 interface MonthlyBalanceProps {
   transactions: Transaction[];
@@ -29,10 +28,13 @@ export function MonthlyBalance({ transactions, month }: MonthlyBalanceProps) {
   };
 
   const formatMonth = (monthStr: string) => {
-    const date = parseYmdLocal(`${monthStr}-01`);
+    // Usar UTC para evitar problemas de zona horaria
+    const [year, month] = monthStr.split('-');
+    const date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 1));
     return date.toLocaleDateString('es-ES', {
       month: 'long',
       year: 'numeric',
+      timeZone: 'UTC'
     });
   };
 

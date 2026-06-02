@@ -7,24 +7,24 @@ import { TransactionForm } from '../components/TransactionForm';
 import { MonthlyBalance } from '../components/MonthlyBalance';
 import { BudgetAlertBanner } from '../components/BudgetAlertBanner';
 
-/** YYYY-MM en calendario local (coincide con <input type="month">). */
-function yearMonthLocal(d = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-/** Mes calendario de una transacción sin pasar por UTC (evita perder movimientos al filtrar). */
-function transactionYearMonth(dateStr: string): string {
-  if (dateStr.length >= 7) return dateStr.slice(0, 7);
-  return '';
-}
-
 export function DashboardPage() {
-  const { transactions, addTransaction, categories } = useApp();
-  const [selectedMonth, setSelectedMonth] = useState(yearMonthLocal);
+  const {
+    transactions,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    categories,
+    budgets,
+  } = useApp();
 
-  const filteredTransactions = transactions.filter(
-    (t) => transactionYearMonth(t.date) === selectedMonth,
-  );
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  // Filtrar transacciones por mes
+  // Comparar directamente las cadenas de fecha sin crear Date objects
+  // para evitar problemas de zona horaria
+  const filteredTransactions = transactions.filter(t => {
+    return t.date.startsWith(selectedMonth);
+  });
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
@@ -49,7 +49,14 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <BudgetAlertBanner transactions={filteredTransactions} budgets={budgets} month={selectedMonth} />
+      {/* HU 3.3.3 — Alerta de sobrepaso de presupuesto
+          Estado A: visible cuando porcentajeUso ≥ 100 (tipo: SOBREPASO)
+          Estado B: oculto cuando no hay presupuesto o está dentro del límite */}
+      <BudgetAlertBanner
+        transactions={filteredTransactions}
+        budgets={budgets}
+        month={selectedMonth}
+      />
 
       {/* Balance Mensual */}
       <MonthlyBalance transactions={filteredTransactions} month={selectedMonth} />
@@ -67,11 +74,16 @@ export function DashboardPage() {
           />
         </div>
 
-        {/* Transaction List */}
+        {/* Transaction List — HU 2.2.5 (ingresos) y HU 2.3.5 (gastos)
+            Hover: botones editar/eliminar
+            onUpdate → PUT /api/transacciones/{id}/usuario
+            onDelete → DELETE /api/transacciones/{id}/usuario (204) */}
         <div className="lg:col-span-2">
           <TransactionList
             transactions={filteredTransactions}
             categories={categories}
+            onUpdate={updateTransaction}
+            onDelete={deleteTransaction}
           />
         </div>
       </div>

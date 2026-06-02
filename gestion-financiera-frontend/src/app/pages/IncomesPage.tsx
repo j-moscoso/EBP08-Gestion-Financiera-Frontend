@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Plus, TrendingUp, Calendar, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
-import type { ScheduledTransaction } from '../types';
-import { compareYmdDesc, formatYmdLocal, parseYmdLocal } from '../lib/calendarDate';
+import type { ScheduledTransaction, Transaction } from '../types';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -27,16 +26,16 @@ export function IncomesPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const scheduledIncomes = scheduledTransactions.filter(t => t.type === 'income');
-  const recentIncomes = transactions
-    .filter((t) => t.type === 'income')
-    .sort((a, b) => compareYmdDesc(a.date, b.date));
+  const recentIncomes = transactions.filter(t => t.type === 'income').sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 
-  const filteredIncomes =
-    dateFilter.start && dateFilter.end
-      ? recentIncomes.filter(
-          (income) => income.date >= dateFilter.start && income.date <= dateFilter.end,
-        )
-      : recentIncomes;
+  const filteredIncomes = dateFilter.start && dateFilter.end
+    ? recentIncomes.filter(income => {
+        const incomeDate = new Date(income.date);
+        return incomeDate >= new Date(dateFilter.start) && incomeDate <= new Date(dateFilter.end);
+      })
+    : recentIncomes;
 
   const totalPages = Math.ceil(filteredIncomes.length / ITEMS_PER_PAGE);
   const paginatedIncomes = filteredIncomes.slice(
@@ -54,7 +53,7 @@ export function IncomesPage() {
     if (!categoryId) newErrors.categoryId = 'Selecciona una categoría';
     if (!startDate) newErrors.startDate = 'Este campo es requerido';
     if (!endDate) newErrors.endDate = 'Este campo es requerido';
-    if (startDate && endDate && parseYmdLocal(startDate) > parseYmdLocal(endDate)) {
+    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
       newErrors.endDate = 'La fecha final debe ser posterior a la inicial';
     }
 
@@ -73,23 +72,16 @@ export function IncomesPage() {
       frequency,
     };
 
-    void (async () => {
-      try {
-        if (editingIncome) {
-          await updateScheduledTransaction(editingIncome.id, incomeData);
-          toast.success('Ingreso programado actualizado');
-          setEditingIncome(null);
-        } else {
-          await addScheduledTransaction(incomeData);
-          toast.success(
-            'Ingreso programado creado. Se aplicará automáticamente en las fechas programadas.',
-          );
-        }
-        resetForm();
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'No se pudo guardar el ingreso programado');
-      }
-    })();
+    if (editingIncome) {
+      updateScheduledTransaction(editingIncome.id, incomeData);
+      toast.success('Ingreso programado actualizado');
+      setEditingIncome(null);
+    } else {
+      addScheduledTransaction(incomeData);
+      toast.success('Ingreso programado creado. Se aplicará automáticamente en las fechas programadas.');
+    }
+
+    resetForm();
   };
 
   const resetForm = () => {
@@ -116,16 +108,9 @@ export function IncomesPage() {
 
   const confirmDelete = () => {
     if (!deletingIncome) return;
-
-    void (async () => {
-      try {
-        await deleteScheduledTransaction(deletingIncome.id);
-        toast.success('Ingreso programado eliminado');
-        setDeletingIncome(null);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
-      }
-    })();
+    deleteScheduledTransaction(deletingIncome.id);
+    toast.success('Ingreso programado eliminado');
+    setDeletingIncome(null);
   };
 
   const formatCurrency = (amount: number) => {
@@ -137,12 +122,14 @@ export function IncomesPage() {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) =>
-    formatYmdLocal(dateString, 'es-CO', {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      timeZone: 'UTC'
     });
+  };
 
   const getFrequencyLabel = (freq: string) => {
     const labels = {

@@ -1,27 +1,39 @@
-import { useState } from 'react';
-import { Plus, Target, AlertCircle, Calendar, TrendingDown, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Target, AlertCircle, Calendar, TrendingDown, CheckCircle2, Bell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
-
-function currentYearMonthLocal(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { getCategoryBudgetsSummary } from '../services/api';
+import type { BackendCategoryBudgetSummary } from '../services/api';
 
 export function BudgetsPage() {
-  const { budgets, addBudget, categories, transactions, resumenPresupuestoGlobal } = useApp();
+  const { budgets, addBudget, transactions, alerts, categories } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [budgetType, setBudgetType] = useState<'global' | 'category'>('global');
-  const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(currentYearMonthLocal);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [categoryBudgetsSummary, setCategoryBudgetsSummary] = useState<BackendCategoryBudgetSummary[]>([]);
+
+  // Cargar presupuestos de categorías desde el backend
+  useEffect(() => {
+    const loadCategoryBudgets = async () => {
+      try {
+        const budgetsSummary = await getCategoryBudgetsSummary();
+        console.log('[BudgetsPage] Presupuestos por categoría cargados:', budgetsSummary.length);
+        setCategoryBudgetsSummary(budgetsSummary);
+      } catch (error: any) {
+        console.error('[BudgetsPage] Error al cargar presupuestos:', error);
+      }
+    };
+
+    loadCategoryBudgets();
+  }, [selectedMonth]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name || !amount) {
-      toast.error('Por favor completa todos los campos');
+    if (!amount) {
+      toast.error('Por favor ingresa el monto límite');
       return;
     }
 
@@ -30,27 +42,21 @@ export function BudgetsPage() {
       return;
     }
 
-    void (async () => {
-      try {
-        await addBudget({
-          name,
-          amount: parseFloat(amount),
-          spent: 0,
-          categoryId: budgetType === 'category' ? categoryId : undefined,
-          month: selectedMonth,
-        });
-        toast.success('Presupuesto guardado exitosamente');
-        setName('');
-        setAmount('');
-        setCategoryId('');
-        setShowForm(false);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'No se pudo guardar el presupuesto');
-      }
-    })();
-  };
+    addBudget({
+      name: budgetType === 'global' ? 'Presupuesto Global' : 'Presupuesto de Categoría',
+      amount: parseFloat(amount),
+      spent: 0,
+      categoryId: budgetType === 'category' ? categoryId : undefined,
+      month: selectedMonth,
+    });
 
-  const currentYm = currentYearMonthLocal();
+    toast.success('Presupuesto creado exitosamente');
+
+    // Reset form
+    setAmount('');
+    setCategoryId('');
+    setShowForm(false);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -80,16 +86,10 @@ export function BudgetsPage() {
 
   const filteredBudgets = budgets.filter(b => b.month === selectedMonth);
   const globalBudget = filteredBudgets.find(b => !b.categoryId);
-  const categoryBudgets = filteredBudgets.filter(b => b.categoryId);
 
-  const availableCategories = categories.filter(c => !c.isDefault);
-
-  // Calcular gastos por categoría del mes seleccionado
-  const getCategorySpent = (categoryId: string) => {
-    return transactions
-      .filter(t => t.type === 'expense' && t.categoryId === categoryId && t.date.startsWith(selectedMonth))
-      .reduce((sum, t) => sum + t.amount, 0);
-  };
+  // Categorías disponibles para asignar presupuesto
+  // Incluye tanto categorías globales del sistema como personalizadas del usuario
+  const availableCategories = categories;
 
   // Calcular gasto total del mes
   const getTotalSpent = () => {
@@ -102,13 +102,6 @@ export function BudgetsPage() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
-      {selectedMonth !== currentYm && (
-        <div className="p-4 rounded-xl border border-border bg-muted/40 text-muted-foreground text-sm">
-          El backend agrupa los presupuestos por mes calendario en curso. Si cambias de mes, solo verás datos
-          que coincidan con ese mes cuando el servidor los devuelva; el detalle disponible suele corresponder al
-          mes actual.
-        </div>
-      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -141,10 +134,7 @@ export function BudgetsPage() {
 
       {/* Formulario de Nuevo Presupuesto */}
       {showForm && (
-        <div
-          id="budget-form-anchor"
-          className="bg-card p-6 rounded-xl shadow-md border border-border scroll-mt-24"
-        >
+        <div className="bg-card p-6 rounded-xl shadow-md border border-border">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-foreground">Crear Nuevo Presupuesto</h2>
@@ -181,39 +171,21 @@ export function BudgetsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Nombre */}
-              <div>
-                <label htmlFor="name" className="block text-foreground mb-2">
-                  Nombre del presupuesto
-                </label>
-                <input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Ej: Presupuesto mensual"
-                  required
-                />
-              </div>
-
-              {/* Monto */}
-              <div>
-                <label htmlFor="amount" className="block text-foreground mb-2">
-                  Monto límite
-                </label>
-                <input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
+            {/* Monto */}
+            <div>
+              <label htmlFor="amount" className="block text-foreground mb-2">
+                Monto límite
+              </label>
+              <input
+                id="amount"
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="0.00"
+                required
+              />
             </div>
 
             {/* Categoría (solo si es por categoría) */}
@@ -269,9 +241,7 @@ export function BudgetsPage() {
               </div>
               <div>
                 <h2 className="text-foreground">{globalBudget.name}</h2>
-                <p className="text-muted-foreground text-sm">
-                  {globalBudget.description?.trim() || 'Presupuesto mensual general'}
-                </p>
+                <p className="text-muted-foreground">Presupuesto mensual general</p>
               </div>
             </div>
             {getStatusIcon(getProgress(totalSpent, globalBudget.amount))}
@@ -324,8 +294,7 @@ export function BudgetsPage() {
           </div>
           <h3 className="text-foreground mb-2">Debes definir un presupuesto primero</h3>
           <p className="text-muted-foreground mb-4">
-            {resumenPresupuestoGlobal?.mensaje?.trim() ||
-              'Crea un presupuesto global para empezar a controlar tus gastos'}
+            Crea un presupuesto global para empezar a controlar tus gastos
           </p>
           <button
             onClick={() => {
@@ -342,81 +311,52 @@ export function BudgetsPage() {
 
       {/* Presupuestos por Categoría */}
       <div>
-        <h2 className="text-foreground mb-4">Presupuestos por Categoría</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-foreground">Presupuestos por Categoría</h2>
+          <button
+            onClick={() => {
+              setBudgetType('category');
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-lg hover:bg-primary/20 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Añadir presupuesto
+          </button>
+        </div>
 
-        {availableCategories.length === 0 ? (
+        {categoryBudgetsSummary.length === 0 ? (
           <div className="bg-card p-8 rounded-xl border border-border text-center shadow-md">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <Target className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-foreground mb-2">No hay categorías disponibles</h3>
-            <p className="text-muted-foreground">
-              Crea categorías primero para poder asignarles presupuestos
+            <h3 className="text-foreground mb-2">No hay presupuestos por categoría</h3>
+            <p className="text-muted-foreground mb-4">
+              Añade presupuestos a tus categorías para controlar mejor tus gastos
             </p>
+            <button
+              onClick={() => {
+                setBudgetType('category');
+                setShowForm(true);
+              }}
+              className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Añadir presupuesto
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {availableCategories.map((category) => {
-              const budget = categoryBudgets.find(b => b.categoryId === category.id);
-              const spent = getCategorySpent(category.id);
-
-              if (!budget) {
-                return (
-                  <div
-                    key={category.id}
-                    className="bg-card p-5 rounded-xl border border-dashed border-muted-foreground/30 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center text-xl">
-                          {category.icon}
-                        </div>
-                        <div>
-                          <h3 className="text-foreground">{category.name}</h3>
-                          <p className="text-muted-foreground text-sm">
-                            {category.descripcionBackend?.trim() || 'Sin presupuesto definido'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 mb-3">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground text-sm">Gastado</span>
-                        <span className="text-destructive">{formatCurrency(spent)}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBudgetType('category');
-                        setCategoryId(category.id);
-                        setShowForm(true);
-                        window.setTimeout(() => {
-                          document
-                            .getElementById('budget-form-anchor')
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }, 50);
-                      }}
-                      className="w-full mt-2 py-2.5 px-3 text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-sm hover:opacity-90 transition-opacity cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    >
-                      Asignar presupuesto
-                    </button>
-                  </div>
-                );
-              }
-
-              const progress = getProgress(spent, budget.amount);
-              const available = Math.max(budget.amount - spent, 0);
+            {categoryBudgetsSummary.map((budgetSummary) => {
+              const budgetAlerts = alerts.filter(alert => alert.presupuestoId === budgetSummary.idPresupuesto);
 
               return (
                 <div
-                  key={category.id}
+                  key={budgetSummary.idCategoria}
                   className={`bg-card p-5 rounded-xl border-2 transition-all ${
-                    progress > 100
+                    budgetSummary.porcentajeUso >= 100
                       ? 'border-destructive/50 shadow-lg shadow-destructive/10'
-                      : progress > 75
+                      : budgetSummary.porcentajeUso >= 75
                       ? 'border-orange-500/50 shadow-lg shadow-orange-500/10'
                       : 'border-primary/20 hover:shadow-lg'
                   }`}
@@ -424,45 +364,61 @@ export function BudgetsPage() {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${
-                        progress > 100 ? 'bg-destructive/10' : 'bg-primary/10'
+                        budgetSummary.porcentajeUso >= 100 ? 'bg-destructive/10' : 'bg-primary/10'
                       }`}>
-                        {category.icon}
+                        <Target className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div>
-                        <h3 className="text-foreground">{category.name}</h3>
-                        <p className="text-muted-foreground text-sm line-clamp-2">
-                          {category.descripcionBackend?.trim() || 'Sin descripción en esta categoría'}
-                        </p>
+                        <h3 className="text-foreground">{budgetSummary.nombreCategoria}</h3>
                       </div>
                     </div>
-                    {getStatusIcon(progress)}
+                    {getStatusIcon(budgetSummary.porcentajeUso)}
                   </div>
+
+                  {/* Alertas */}
+                  {budgetAlerts.length > 0 && (
+                    <div className="mb-4 space-y-2">
+                      {budgetAlerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-start gap-2"
+                        >
+                          <Bell className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-orange-700 dark:text-orange-400 text-sm">
+                              {alert.mensaje}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="space-y-2 mb-3">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground text-sm">Asignado</span>
-                      <span className="text-foreground">{formatCurrency(budget.amount)}</span>
+                      <span className="text-muted-foreground text-sm">Límite</span>
+                      <span className="text-foreground">{formatCurrency(budgetSummary.montoLimite)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground text-sm">Gastado</span>
-                      <span className="text-destructive">{formatCurrency(spent)}</span>
+                      <span className="text-destructive">{formatCurrency(budgetSummary.gastado)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground text-sm">Disponible</span>
-                      <span className="text-primary">{formatCurrency(available)}</span>
+                      <span className="text-primary">{formatCurrency(budgetSummary.disponible)}</span>
                     </div>
                   </div>
 
                   {/* Barra de progreso */}
                   <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                     <div
-                      className={`h-full ${getProgressColor(progress)} transition-all duration-500`}
-                      style={{ width: `${Math.min(progress, 100)}%` }}
+                      className={`h-full ${getProgressColor(budgetSummary.porcentajeUso)} transition-all duration-500`}
+                      style={{ width: `${Math.min(budgetSummary.porcentajeUso, 100)}%` }}
                     ></div>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-muted-foreground text-xs">{progress.toFixed(0)}%</span>
-                    {progress > 100 && (
+                    <span className="text-muted-foreground text-xs">{budgetSummary.porcentajeUso.toFixed(0)}%</span>
+                    {budgetSummary.porcentajeUso >= 100 && (
                       <span className="text-destructive text-xs">¡Límite superado!</span>
                     )}
                   </div>

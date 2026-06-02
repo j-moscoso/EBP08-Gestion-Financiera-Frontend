@@ -10,9 +10,10 @@ export function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('📁');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name) {
@@ -20,32 +21,34 @@ export function CategoriesPage() {
       return;
     }
 
-    void (async () => {
-      try {
-        if (editingCategory) {
-          await updateCategory(editingCategory.id, {
-            name,
-            icon,
-            descripcionBackend: editingCategory.descripcionBackend ?? name,
-          });
-          toast.success('Información actualizada');
-          setEditingCategory(null);
-        } else {
-          await addCategory({ name, icon });
-          toast.success('Categoría creada exitosamente');
-        }
-        setName('');
-        setIcon('📁');
-        setShowForm(false);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'No se pudo guardar la categoría');
+    if (!description) {
+      toast.error('Por favor ingresa una descripción para la categoría');
+      return;
+    }
+
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, { name, description, icon });
+      } else {
+        await addCategory({ name, description, icon });
       }
-    })();
+    } catch (error: any) {
+      console.error('[CategoriesPage] Error al guardar categoría:', error);
+      // Error ya manejado en el contexto
+    }
+
+    // Reset form
+    setName('');
+    setDescription('');
+    setIcon('📁');
+    setShowForm(false);
+    setEditingCategory(null);
   };
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
     setName(category.name);
+    setDescription(category.description || '');
     setIcon(category.icon);
     setShowForm(true);
   };
@@ -54,18 +57,16 @@ export function CategoriesPage() {
     setDeletingCategory(category);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deletingCategory) return;
 
-    void (async () => {
-      try {
-        await deleteCategory(deletingCategory.id);
-        toast.success('Categoría eliminada');
-        setDeletingCategory(null);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'No se pudo eliminar la categoría');
-      }
-    })();
+    try {
+      await deleteCategory(deletingCategory.id);
+      setDeletingCategory(null);
+    } catch (error) {
+      // Error ya manejado en el contexto
+      setDeletingCategory(null);
+    }
   };
 
   const getCategoryUsageCount = (categoryId: string) => {
@@ -125,6 +126,22 @@ export function CategoriesPage() {
               />
             </div>
 
+            {/* Descripción */}
+            <div>
+              <label htmlFor="description" className="block text-foreground mb-2">
+                Descripción
+              </label>
+              <input
+                id="description"
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Ej: Gastos relacionados con el gimnasio"
+                required
+              />
+            </div>
+
             {/* Selector de Icono */}
             <div>
               <label className="block text-foreground mb-2">
@@ -170,6 +187,7 @@ export function CategoriesPage() {
                   setShowForm(false);
                   setEditingCategory(null);
                   setName('');
+                  setDescription('');
                   setIcon('📁');
                 }}
                 className="px-6 py-3 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
@@ -206,12 +224,17 @@ export function CategoriesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-foreground truncate">{category.name}</h3>
+                    {category.description && (
+                      <p className="text-muted-foreground text-sm mt-1 truncate">
+                        {category.description}
+                      </p>
+                    )}
                     {category.isDefault && (
                       <span className="inline-block mt-1 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">
                         Por defecto
                       </span>
                     )}
-                    {!category.readonly && (
+                    {!category.isDefault && (
                       <div className="flex items-center gap-2 mt-3">
                         <button
                           onClick={() => handleEdit(category)}
@@ -247,7 +270,7 @@ export function CategoriesPage() {
               <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
                 <p className="text-foreground text-sm">
                   Esta categoría está en uso en {getCategoryUsageCount(deletingCategory.id)} transacción(es).
-                  Las transacciones se moverán a la categoría global OTROS.
+                  Las transacciones se moverán a la categoría "Sin categoría".
                 </p>
               </div>
             ) : (

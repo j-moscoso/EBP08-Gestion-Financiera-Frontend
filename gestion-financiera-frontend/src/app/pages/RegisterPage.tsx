@@ -4,10 +4,11 @@ import { UserPlus, Mail, Lock, User, Eye, EyeOff, CheckCircle2, Loader2 } from '
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 import logo from '../../imports/Logo_login.png';
+import * as api from '../services/api';
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const { user, registerAndSignIn } = useApp();
+  const { user, loginWithCredentials } = useApp();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +25,7 @@ export function RegisterPage() {
     }
   }, [user, navigate]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const newErrors: string[] = [];
@@ -42,19 +43,30 @@ export function RegisterPage() {
     }
 
     setLoading(true);
+    setErrors([]);
 
-    void (async () => {
-      try {
-        await registerAndSignIn(name.trim(), email.trim(), password);
-        toast.success('¡Cuenta creada exitosamente!');
-        navigate('/');
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : 'No se pudo crear la cuenta';
-        setErrors([msg]);
-      } finally {
-        setLoading(false);
+    try {
+      // Registrar usuario en el backend
+      const result = await api.registerUser(name, email, password);
+
+      // Guardar códigos de recuperación en sessionStorage para mostrarlos
+      sessionStorage.setItem('recovery_codes', JSON.stringify(result.codigosRecuperacion));
+      sessionStorage.setItem('pending_email', email);
+      sessionStorage.setItem('pending_password', password);
+
+      toast.success('¡Cuenta creada exitosamente!');
+      navigate('/recovery-codes');
+    } catch (error: any) {
+      const errorMessage = error.message || 'Error al crear la cuenta';
+      if (errorMessage.includes('ya registrado') || errorMessage.includes('Conflict')) {
+        newErrors.push('Este correo electrónico ya está registrado');
+      } else {
+        newErrors.push(errorMessage);
       }
-    })();
+      setErrors(newErrors);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,7 +79,7 @@ export function RegisterPage() {
             alt="Logo"
             className="w-20 h-20 object-contain mx-auto mb-4"
           />
-          <h1 className="text-foreground mb-2">Crear Cuenta</h1>
+          <h1 className="text-foreground mb-2">EKO - Gestión Financiera</h1>
           <p className="text-muted-foreground">Comienza a gestionar tus finanzas personales</p>
         </div>
 

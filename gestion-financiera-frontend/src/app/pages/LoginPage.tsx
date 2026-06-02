@@ -7,7 +7,7 @@ import { AppLogo } from '../components/AppLogo';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { user, validateLogin } = useApp();
+  const { user, loginWithCredentials } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,8 +21,7 @@ export function LoginPage() {
     }
   }, [user, navigate]);
 
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validación básica
@@ -32,26 +31,31 @@ export function LoginPage() {
     }
 
     setLoading(true);
+    setError('');
 
-    void (async () => {
-      try {
-        const authenticated = await validateLogin(email, password.trim());
-        if (!authenticated) {
-          setError('No se pudo completar el inicio de sesión.');
-          return;
+    try {
+      await loginWithCredentials(email, password);
+      toast.success('¡Bienvenido!');
+      navigate('/');
+    } catch (err: any) {
+      let errorMessage = 'Correo electrónico o contraseña incorrectos';
+
+      // Intentar parsear el error si viene como JSON
+      if (err.message) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          // Si no es JSON, usar el mensaje tal cual
+          errorMessage = err.message;
         }
-        toast.success('¡Bienvenido!');
-        navigate('/');
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Correo electrónico o contraseña incorrectos. Si no tienes cuenta, regístrate primero.',
-        );
-      } finally {
-        setLoading(false);
       }
-    })();
+
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -60,7 +64,7 @@ export function LoginPage() {
         {/* Logo y Header */}
         <div className="text-center mb-8">
           <AppLogo className="h-20 w-auto mx-auto mb-4" />
-          <h1 className="text-foreground mb-2">Gestión Financiera</h1>
+          <h1 className="text-foreground mb-2">EKO - Gestión Financiera</h1>
           <p className="text-muted-foreground">Ingresa a tu cuenta para continuar</p>
         </div>
 
@@ -96,7 +100,7 @@ export function LoginPage() {
                   Contraseña
                 </label>
                 <Link
-                  to="/forgot-password"
+                  to={`/recovery-code-login${email ? `?email=${encodeURIComponent(email)}` : ''}`}
                   className="text-sm text-primary hover:underline"
                 >
                   ¿Olvidaste tu contraseña?
