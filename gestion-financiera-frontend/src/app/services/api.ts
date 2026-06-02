@@ -108,18 +108,9 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 
   // Manejar errores de autenticación
   if (response.status === 401 || response.status === 403) {
-    const token = localStorage.getItem('authToken');
     console.error('[handleResponse] ❌ Error de autenticación:', response.status);
-    console.error('[handleResponse] Token existe?', !!token);
-    console.error('[handleResponse] Path actual:', window.location.pathname);
+    console.error('[handleResponse] URL:', response.url);
 
-    // Solo limpiar sesión si hay token guardado y no estamos en login
-    if (token && !window.location.pathname.includes('/login')) {
-      console.warn('[handleResponse] 🗑️ BORRANDO TOKEN por sesión expirada');
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
     // Leer el mensaje de error del backend
     let errorMessage = 'No autorizado';
     try {
@@ -128,6 +119,10 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
     } catch {
       // Si no se puede leer el texto, usar mensaje por defecto
     }
+
+    // NO borrar el token aquí - solo lanzar el error
+    // El manejo de sesión debe hacerse en un lugar más controlado
+    console.error('[handleResponse] Lanzando error sin borrar token:', errorMessage);
     throw new Error(errorMessage);
   }
 

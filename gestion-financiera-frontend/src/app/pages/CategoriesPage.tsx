@@ -27,26 +27,19 @@ export function CategoriesPage() {
     try {
       if (editingCategory) {
         if (editingCategory.backendId) {
-          await apiUpdateCategory(editingCategory.backendId, nombreInterno, '');
+          await apiUpdateCategory(editingCategory.backendId, nombreInterno, nombreInterno);
         }
         updateCategory(editingCategory.id, { name: nombreInterno, icon });
         toast.success('Información actualizada');
         setEditingCategory(null);
       } else {
-        const backendCategory = await createCategory(nombreInterno, '');
+        const backendCategory = await createCategory(nombreInterno, nombreInterno);
         addCategory({ name: nombreInterno, icon, backendId: backendCategory.id });
         toast.success('Categoría creada exitosamente');
       }
-    } catch {
-      // Si falla el backend, igual actualizamos el estado local
-      if (editingCategory) {
-        updateCategory(editingCategory.id, { name: nombreInterno, icon });
-        toast.success('Información actualizada (local)');
-        setEditingCategory(null);
-      } else {
-        addCategory({ name: nombreInterno, icon });
-        toast.success('Categoría creada exitosamente (local)');
-      }
+    } catch (error: any) {
+      console.error('[CategoriesPage] Error al guardar categoría:', error);
+      toast.error(error.message || 'Error al guardar la categoría');
     }
 
     // Reset form
