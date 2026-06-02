@@ -38,7 +38,19 @@ export function LoginPage() {
       toast.success('¡Bienvenido!');
       navigate('/');
     } catch (err: any) {
-      const errorMessage = err.message || 'Correo electrónico o contraseña incorrectos';
+      let errorMessage = 'Correo electrónico o contraseña incorrectos';
+
+      // Intentar parsear el error si viene como JSON
+      if (err.message) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          // Si no es JSON, usar el mensaje tal cual
+          errorMessage = err.message;
+        }
+      }
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

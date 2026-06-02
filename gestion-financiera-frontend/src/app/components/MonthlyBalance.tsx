@@ -28,10 +28,13 @@ export function MonthlyBalance({ transactions, month }: MonthlyBalanceProps) {
   };
 
   const formatMonth = (monthStr: string) => {
-    const date = new Date(monthStr + '-01');
+    // Usar UTC para evitar problemas de zona horaria
+    const [year, month] = monthStr.split('-');
+    const date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 1));
     return date.toLocaleDateString('es-ES', {
       month: 'long',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC'
     });
   };
 
