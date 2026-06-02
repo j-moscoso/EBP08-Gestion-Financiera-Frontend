@@ -79,7 +79,7 @@ export interface BackendRegistrationResponse {
 
 // ===== HELPERS =====
 
-const getToken = (): string | null => {
+export const getToken = (): string | null => {
   return localStorage.getItem('authToken');
 };
 
@@ -596,7 +596,8 @@ export const getAlertRecommendations = async (): Promise<string> => {
 // ===== HELPERS DE ALMACENAMIENTO =====
 
 export const saveAuthToken = (token: string): void => {
-  localStorage.setItem('authToken', token);
+  const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
+  localStorage.setItem('authToken', cleanToken);
 };
 
 export const saveUser = (user: BackendUser): void => {

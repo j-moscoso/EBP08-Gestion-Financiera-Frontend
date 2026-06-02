@@ -50,40 +50,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Cargar usuario desde localStorage al iniciar
   useEffect(() => {
+    const token = api.getToken();
     const storedUser = api.getStoredUser();
-    if (storedUser) {
+
+    if (token && storedUser) {
+      // Si hay token y usuario guardado, restaurar sesión
       setUser(mapBackendUser(storedUser));
       loadUserData();
+    } else if (token) {
+      // Si solo hay token, crear usuario temporal y cargar datos
+      setUser({
+        id: 'pending',
+        name: 'Usuario',
+        email: ''
+      });
+      loadUserData();
     }
-  }, []);
+  }, [loadUserData]);
 
   // Función para iniciar sesión
   const loginWithCredentials = async (email: string, password: string): Promise<User> => {
     setLoading(true);
     try {
-      // Obtener token
+      // Paso 1: Obtener y guardar token
       const token = await api.loginUser(email, password);
       api.saveAuthToken(token);
 
-      // Cargar categorías para obtener información del usuario
-      const backendCategories = await api.getUserCategories();
+      // Paso 2: Crear usuario temporal
+      const temporalUser: User = {
+        id: 'pending',
+        name: email.split('@')[0],
+        email: email
+      };
+      setUser(temporalUser);
 
-      // El usuario viene en las categorías, extraerlo de ahí
-      const backendUser = backendCategories.find(c => c.usuario)?.usuario;
+      // Paso 3: Cargar todos los datos del usuario (secuencial)
+      await loadUserData();
 
-      if (backendUser) {
-        api.saveUser(backendUser);
-        const mappedUser = mapBackendUser(backendUser);
-        setUser(mappedUser);
-
-        // Cargar datos del usuario
-        await loadUserData();
-
-        return mappedUser;
-      } else {
-        throw new Error('No se pudo obtener información del usuario');
-      }
+      return temporalUser;
     } catch (error) {
+      // Si falla, limpiar token guardado
+      api.clearAuth();
+      setUser(null);
       throw error;
     } finally {
       setLoading(false);
@@ -107,20 +115,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Función para cargar todos los datos del usuario
-  const loadUserData = async (): Promise<void> => {
+  const loadUserData = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      // Cargar categorías
+      // Paso 1: Cargar categorías y extraer información del usuario
       const backendCategories = await api.getUserCategories();
       const mappedCategories = backendCategories.map(mapBackendCategory);
       setCategories(mappedCategories);
 
-      // Cargar transacciones
+      // Extraer y actualizar información del usuario desde las categorías
+      const backendUser = backendCategories.find(c => c.usuario)?.usuario;
+      if (backendUser) {
+        api.saveUser(backendUser);
+        const mappedUser = mapBackendUser(backendUser);
+        setUser(mappedUser);
+      }
+
+      // Paso 2: Cargar transacciones
       const backendTransactions = await api.getUserTransactions();
       const mappedTransactions = backendTransactions.map(mapBackendTransaction);
       setTransactions(mappedTransactions);
 
-      // Cargar transacciones programadas (ingresos + gastos)
+      // Paso 3: Cargar transacciones programadas
       const [backendIncomes, backendExpenses] = await Promise.all([
         api.getScheduledIncomes(),
         api.getScheduledExpenses(),
@@ -131,7 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ];
       setScheduledTransactions(mappedScheduled);
 
-      // Cargar presupuestos (global + por categoría)
+      // Paso 4: Cargar presupuestos
       const currentMonth = new Date().toISOString().slice(0, 7);
       const [globalBudget, categoryBudgets] = await Promise.all([
         api.getGlobalBudgetSummary(),
@@ -140,13 +156,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const mappedBudgets: Budget[] = [];
 
-      // Presupuesto global
       const globalMapped = mapBackendBudget(globalBudget, currentMonth);
       if (globalMapped) {
         mappedBudgets.push(globalMapped);
       }
 
-      // Presupuestos por categoría
       categoryBudgets.forEach(catBudget => {
         const mapped = mapBackendBudget(catBudget, currentMonth);
         if (mapped) {
@@ -161,7 +175,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Función para cambiar contraseña
   const changePassword = async (oldPassword: string, newPassword: string): Promise<void> => {
