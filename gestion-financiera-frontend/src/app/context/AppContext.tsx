@@ -79,7 +79,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       // Obtener token del backend
       const token = await api.loginUser(email, password);
+      console.log('✅ Login exitoso, token recibido');
+
+      // Guardar token
       api.saveAuthToken(token);
+
+      // Verificar que se guardó correctamente
+      const savedToken = api.getToken();
+      if (!savedToken) {
+        throw new Error('Error al guardar el token de autenticación');
+      }
+      console.log('✅ Token guardado correctamente en localStorage');
 
       // Crear usuario temporal solo con el email
       // La información completa se obtendrá al cargar los datos en el dashboard
