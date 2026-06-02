@@ -85,11 +85,13 @@ export const getToken = (): string | null => {
   return token;
 };
 
-const getAuthHeaders = (): HeadersInit => {
+const getAuthHeaders = (includeContentType: boolean = false): HeadersInit => {
   const token = getToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
+  const headers: HeadersInit = {};
+
+  if (includeContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -194,7 +196,7 @@ export const logoutUser = async (): Promise<void> => {
   console.log('[logoutUser] Iniciando logout...');
   const response = await fetch(`${BASE_URL}/usuarios/logout`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(), // POST sin body
   });
 
   await handleResponse<void>(response);
@@ -208,7 +210,7 @@ export const changePassword = async (
 ): Promise<string> => {
   const response = await fetch(`${BASE_URL}/usuarios/actualizarClave`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // PUT con body
     body: JSON.stringify({ claveAntigua, claveNueva }),
   });
 
@@ -253,7 +255,7 @@ export const createCategory = async (
 ): Promise<BackendCategory> => {
   const response = await fetch(`${BASE_URL}/categorias/crearCategoriaPropia`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // POST con body
     body: JSON.stringify({ nombre, descripcion }),
   });
 
@@ -267,7 +269,7 @@ export const updateCategory = async (
 ): Promise<BackendCategory> => {
   const response = await fetch(`${BASE_URL}/categorias/actualizarCategoriaPropia/${idCategoria}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // PUT con body
     body: JSON.stringify({ nombre, descripcion }),
   });
 
@@ -302,7 +304,7 @@ export const createTransaction = async (
 ): Promise<{ transaccion: BackendTransaction; alertasGeneradas: any[] }> => {
   const response = await fetch(`${BASE_URL}/transacciones`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // POST con body
     body: JSON.stringify({
       idCategoria,
       tipo,
@@ -350,7 +352,7 @@ export const updateTransaction = async (
 ): Promise<BackendTransaction> => {
   const response = await fetch(`${BASE_URL}/transacciones/${idTransaccion}/usuario`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // PUT con body
     body: JSON.stringify({
       idCategoria,
       tipo,
@@ -384,7 +386,7 @@ export const createScheduledTransaction = async (
 ): Promise<BackendScheduledTransaction> => {
   const response = await fetch(`${BASE_URL}/transacciones-programadas/usuario`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // POST con body
     body: JSON.stringify({
       monto,
       descripcion,
@@ -410,7 +412,7 @@ export const updateScheduledTransaction = async (
 ): Promise<BackendScheduledTransaction> => {
   const response = await fetch(`${BASE_URL}/transacciones-programadas/usuario/${id}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // PUT con body
     body: JSON.stringify({
       monto,
       descripcion,
@@ -458,7 +460,7 @@ export const createOrUpdateGlobalBudget = async (
 ): Promise<BackendBudget> => {
   const response = await fetch(`${BASE_URL}/presupuestos/global`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // POST con body
     body: JSON.stringify({ montoLimite }),
   });
 
@@ -471,7 +473,7 @@ export const createOrUpdateCategoryBudget = async (
 ): Promise<BackendBudget> => {
   const response = await fetch(`${BASE_URL}/presupuestos/categoria`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true), // POST con body
     body: JSON.stringify({ idCategoria, montoLimite }),
   });
 
