@@ -80,7 +80,9 @@ export interface BackendRegistrationResponse {
 // ===== HELPERS =====
 
 export const getToken = (): string | null => {
-  return localStorage.getItem('authToken');
+  const token = localStorage.getItem('authToken');
+  console.log('[getToken] Token leído:', token ? `${token.substring(0, 20)}...` : 'NULL');
+  return token;
 };
 
 const getAuthHeaders = (): HeadersInit => {
@@ -91,17 +93,27 @@ const getAuthHeaders = (): HeadersInit => {
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+    console.log('[getAuthHeaders] Header construido con token:', `Bearer ${token.substring(0, 20)}...`);
+  } else {
+    console.warn('[getAuthHeaders] ⚠️ No hay token - header sin Authorization');
   }
 
   return headers;
 };
 
 const handleResponse = async <T>(response: Response): Promise<T> => {
+  console.log('[handleResponse] Status:', response.status, 'URL:', response.url);
+
   // Manejar errores de autenticación
   if (response.status === 401 || response.status === 403) {
     const token = localStorage.getItem('authToken');
+    console.error('[handleResponse] ❌ Error de autenticación:', response.status);
+    console.error('[handleResponse] Token existe?', !!token);
+    console.error('[handleResponse] Path actual:', window.location.pathname);
+
     // Solo limpiar sesión si hay token guardado y no estamos en login
     if (token && !window.location.pathname.includes('/login')) {
+      console.warn('[handleResponse] 🗑️ BORRANDO TOKEN por sesión expirada');
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -179,14 +191,15 @@ export const loginUser = async (
 };
 
 export const logoutUser = async (): Promise<void> => {
+  console.log('[logoutUser] Iniciando logout...');
   const response = await fetch(`${BASE_URL}/usuarios/logout`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
 
   await handleResponse<void>(response);
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('user');
+  console.log('[logoutUser] ✅ Logout exitoso en backend');
+  // NO borramos el token aquí porque AppContext lo hace con clearAuth()
 };
 
 export const changePassword = async (
@@ -615,8 +628,15 @@ export const getAlertRecommendations = async (): Promise<string> => {
 // ===== HELPERS DE ALMACENAMIENTO =====
 
 export const saveAuthToken = (token: string): void => {
+  console.log('[saveAuthToken] Token recibido (primeros 20 chars):', token.substring(0, 20));
   const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
+  console.log('[saveAuthToken] Token limpio (primeros 20 chars):', cleanToken.substring(0, 20));
   localStorage.setItem('authToken', cleanToken);
+  console.log('[saveAuthToken] ✅ Token guardado en localStorage');
+
+  // Verificar inmediatamente que se guardó
+  const verificacion = localStorage.getItem('authToken');
+  console.log('[saveAuthToken] Verificación - Token en storage:', verificacion ? `${verificacion.substring(0, 20)}...` : 'NULL');
 };
 
 export const saveUser = (user: BackendUser): void => {
@@ -634,6 +654,9 @@ export const getStoredUser = (): BackendUser | null => {
 };
 
 export const clearAuth = (): void => {
+  console.warn('[clearAuth] 🗑️ BORRANDO token y usuario');
+  console.trace('[clearAuth] Stack trace:');
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
+  console.log('[clearAuth] ✅ Token y usuario borrados');
 };

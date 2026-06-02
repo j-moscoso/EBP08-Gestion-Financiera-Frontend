@@ -50,13 +50,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Función para iniciar sesión
   const loginWithCredentials = async (email: string, password: string): Promise<User> => {
+    console.log('[loginWithCredentials] 🔐 Iniciando login para:', email);
     setLoading(true);
     try {
       // Paso 1: Obtener y guardar token
+      console.log('[loginWithCredentials] Paso 1: Llamando a loginUser...');
       const token = await api.loginUser(email, password);
+      console.log('[loginWithCredentials] Token recibido del backend (primeros 20):', token.substring(0, 20));
+
+      console.log('[loginWithCredentials] Guardando token...');
       api.saveAuthToken(token);
+      console.log('[loginWithCredentials] Token guardado');
 
       // Paso 2: Crear usuario temporal
+      console.log('[loginWithCredentials] Paso 2: Creando usuario temporal');
       const temporalUser: User = {
         id: 'pending',
         name: email.split('@')[0],
@@ -65,10 +72,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUser(temporalUser);
 
       // Paso 3: Cargar todos los datos del usuario
+      console.log('[loginWithCredentials] Paso 3: Cargando datos del usuario...');
       await loadUserData();
+      console.log('[loginWithCredentials] ✅ Login completado exitosamente');
 
       return temporalUser;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[loginWithCredentials] ❌ Error durante login:', error);
       // Si falla, limpiar token guardado
       api.clearAuth();
       setUser(null);
@@ -96,10 +106,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Función para cargar todos los datos del usuario
   const loadUserData = useCallback(async (): Promise<void> => {
+    console.log('[loadUserData] 📊 Iniciando carga de datos...');
     setLoading(true);
     try {
       // Paso 1: Cargar categorías y extraer información del usuario
+      console.log('[loadUserData] Cargando categorías...');
       const backendCategories = await api.getUserCategories();
+      console.log('[loadUserData] Categorías cargadas:', backendCategories.length);
       const mappedCategories = backendCategories.map(mapBackendCategory);
       setCategories(mappedCategories);
 
