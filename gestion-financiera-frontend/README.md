@@ -36,27 +36,6 @@ Aplicación web moderna para la gestión de finanzas personales con seguimiento 
   - 🟠 Naranja: 80-99% consumido
   - 🔴 Rojo: ≥ 100% consumido
 - Alertas automáticas al acercarse al límite
-- Sincronización automática con gastos del mes
-
-### 📊 Reportes y Análisis
-- **Gastos por categoría** con gráficos de dona interactivos
-- **Ingresos por categoría** con visualizaciones detalladas
-- **Comparativa mensual** entre ingresos y gastos
-- Filtrado por mes y año
-- Métricas de ahorro y balance
-- Datos obtenidos del backend en tiempo real
-
-### 💡 Recomendaciones Inteligentes
-- Sugerencias personalizadas según tu balance mensual
-- Alertas basadas en el uso de presupuestos
-- Recomendaciones generadas por el backend
-- Actualización en tiempo real
-
-### 🌓 Personalización
-- Tema claro y oscuro
-- Cambio de contraseña
-- Gestión de códigos de recuperación
-- Perfil de usuario
 
 ## 🎨 Diseño
 
@@ -159,102 +138,56 @@ Aplicación web moderna para la gestión de finanzas personales con seguimiento 
 - ✅ Inicio de sesión exitoso
 - ❌ Errores de validación
 
-## 📊 Persistencia de Datos
+## 📊 Datos de Ejemplo
 
-Todos los datos se almacenan en el backend:
-- **Usuarios**: Registro completo con autenticación JWT
-- **Categorías**: 12 categorías globales + categorías personalizadas
-- **Transacciones**: Historial completo de ingresos y gastos
-- **Presupuestos**: Configuración mensual persistente
-- **Recomendaciones**: Generadas dinámicamente por el backend
+La aplicación incluye datos de muestra:
+- 4 transacciones predefinidas
+- 10 categorías estándar
+- 3 presupuestos de ejemplo
+- Mes actual: Abril 2026
 
 ## 🛠️ Tecnologías
 
-### Frontend
 - **React 18** - Framework de UI
 - **TypeScript** - Tipado estático
 - **React Router 7** - Navegación
 - **Tailwind CSS 4** - Estilos
 - **Lucide React** - Iconos
 - **Sonner** - Notificaciones
-- **Recharts** - Gráficos y visualizaciones
 - **Context API** - Estado global
 
-### Backend
-- **Spring Boot** - Framework de backend
-- **JWT** - Autenticación segura
-- **PostgreSQL** - Base de datos
-- **REST API** - Arquitectura de servicios
-- **Desplegado en Render** - https://eko-mj59.onrender.com
+## ⚠️ Limitaciones Actuales
 
-## 🔧 Configuración
-
-### Variables de Entorno
-
-Crea un archivo `.env` en la raíz del proyecto (opcional):
-
-```bash
-# URL del backend (por defecto usa producción)
-VITE_API_BASE_URL=https://eko-mj59.onrender.com/api
-
-# Para desarrollo local con backend en tu máquina:
-# VITE_API_BASE_URL=http://localhost:8080/api
-```
-
-### Instalación
-
-```bash
-# Instalar dependencias
-pnpm install
-
-# Ejecutar en desarrollo
-pnpm dev
-
-# Construir para producción
-pnpm build
-```
+Esta es una aplicación frontend sin backend:
+- Los datos se almacenan solo en memoria
+- Los datos se pierden al recargar la página
+- No hay persistencia real de usuarios
+- La autenticación es simulada
+- Los presupuestos no se actualizan automáticamente con las transacciones
 
 ## 🎯 Historias de Usuario Implementadas
 
-### Autenticación y Perfil
-✅ **HU 1.1.1** - Registro de usuario con códigos de recuperación  
-✅ **HU 1.1.2** - Inicio de sesión con JWT  
+✅ **HU 1.1.1** - Registro de usuario  
+✅ **HU 1.1.2** - Inicio de sesión  
 ✅ **HU 1.1.3** - Cierre de sesión  
-✅ **HU 1.1.4** - Cambio de contraseña  
-✅ **HU 1.1.5** - Recuperación de cuenta con códigos  
-
-### Categorías y Transacciones
 ✅ **HU 2.1.1** - Crear categorías personalizadas  
 ✅ **HU 2.1.2** - Asignar categoría a transacción  
 ✅ **HU 2.2.1** - Crear ingreso manual  
 ✅ **HU 2.3.1** - Crear gasto manual  
-✅ **HU 2.4.1** - Editar y eliminar transacciones  
-✅ **HU 2.5.1** - Transacciones programadas/recurrentes  
-
-### Presupuestos
 ✅ **HU 3.1.1** - Definir presupuesto mensual global  
 ✅ **HU 3.1.2** - Definir presupuestos por categoría  
-✅ **HU 3.1.3** - Ver estado de presupuestos con alertas  
-
-### Dashboard y Reportes
 ✅ **HU 4.1.1** - Ver balance mensual acumulado  
-✅ **HU 5.1.1** - Generar reporte de gastos por categoría  
-✅ **HU 5.1.2** - Generar reporte de ingresos por categoría  
-✅ **HU 5.1.3** - Generar reporte comparativo ingreso vs gasto  
-
-### Recomendaciones
-✅ **HU 4.1.1** - Visualizar recomendaciones según presupuesto  
-✅ **HU 4.1.2** - Visualizar recomendaciones según balance mensual  
 
 ## 📝 Próximas Mejoras
 
-- [ ] Exportación de reportes en PDF/CSV
-- [ ] Metas de ahorro personalizadas
-- [ ] Recordatorios de pagos recurrentes
+- [ ] Persistencia de datos con backend
+- [ ] Gráficos de gastos por categoría
+- [ ] Exportación de reportes
+- [ ] Metas de ahorro
+- [ ] Recordatorios de pagos
+- [ ] Modo oscuro
 - [ ] Multi-moneda
-- [ ] Notificaciones push
-- [ ] Proyecciones financieras
-- [ ] Análisis de tendencias
+- [ ] Comparativas mensuales
 
 ## 👨‍💻 Desarrollo
 

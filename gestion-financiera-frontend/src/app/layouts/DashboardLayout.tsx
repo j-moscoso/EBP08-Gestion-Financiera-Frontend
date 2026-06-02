@@ -7,7 +7,7 @@ import { AppLogo } from '../components/AppLogo';
 export function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, loadUserData } = useApp();
+  const { user, logout } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Redirigir a login si no hay usuario
@@ -16,14 +16,6 @@ export function DashboardLayout() {
       navigate('/login');
     }
   }, [user, navigate]);
-
-  // Cargar datos del usuario al entrar al dashboard
-  useEffect(() => {
-    if (user && user.id === 'pending') {
-      // Si el usuario es temporal (solo token), cargar datos completos
-      loadUserData();
-    }
-  }, [user, loadUserData]);
 
   if (!user) {
     return null;

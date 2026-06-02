@@ -79,35 +79,36 @@ export interface BackendRegistrationResponse {
 
 // ===== HELPERS =====
 
+const getToken = (): string | null => {
+  return localStorage.getItem('authToken');
+};
+
 const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('authToken');
+  const token = getToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token.trim()}`;
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   return headers;
 };
 
 const handleResponse = async <T>(response: Response): Promise<T> => {
-  if (!response.ok) {
-    // Si es 401 o 403, limpiar autenticación
-    if (response.status === 401 || response.status === 403) {
-      const token = localStorage.getItem('authToken');
-      // Solo limpiar si hay token (sesión expirada), no en errores de login
-      if (token) {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        // Redirigir solo si no estamos ya en login
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
-      }
+  if (response.status === 401 || response.status === 403) {
+    const token = localStorage.getItem('authToken');
+    if (token && !window.location.pathname.includes('/login')) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
+    const error = await response.text();
+    throw new Error(error || 'No autorizado');
+  }
 
+  if (!response.ok) {
     const error = await response.text();
     throw new Error(error || `Error ${response.status}`);
   }
@@ -595,12 +596,7 @@ export const getAlertRecommendations = async (): Promise<string> => {
 // ===== HELPERS DE ALMACENAMIENTO =====
 
 export const saveAuthToken = (token: string): void => {
-  const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
-  localStorage.setItem('authToken', cleanToken);
-};
-
-export const getToken = (): string | null => {
-  return localStorage.getItem('authToken');
+  localStorage.setItem('authToken', token);
 };
 
 export const saveUser = (user: BackendUser): void => {
