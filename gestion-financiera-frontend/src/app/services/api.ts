@@ -261,8 +261,9 @@ async function handleJsonResponse<T>(response: Response, opts?: { allow401Naviga
 async function fetchAuthorized(path: string, init?: RequestInit): Promise<Response> {
   const fullUrl = `${BASE_URL}${path}`;
   try {
+    const hasAuth = Boolean(getToken());
     // eslint-disable-next-line no-console
-    console.debug('API fetch', { url: fullUrl, method: init?.method ?? 'GET' });
+    console.debug('API fetch', { url: fullUrl, method: init?.method ?? 'GET', hasAuth });
     return await fetch(fullUrl, {
       ...init,
       headers: mergeHeaders(init?.headers),
