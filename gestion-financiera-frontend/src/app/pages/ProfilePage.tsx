@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { User, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Sun, Moon } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { toast } from 'sonner';
 
 export function ProfilePage() {
   const { user, changePassword } = useApp();
+  const { theme, setTheme } = useTheme();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -13,17 +15,17 @@ export function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [loading, setLoading] = useState(false);
 
   const validatePassword = (password: string) => {
     return password.length >= 8;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const newErrors: { [key: string]: string } = {};
 
+    // Validaciones
     if (!currentPassword) {
       newErrors.currentPassword = 'Este campo es requerido';
     }
@@ -43,28 +45,22 @@ export function ProfilePage() {
       return;
     }
 
-    setLoading(true);
-    void (async () => {
-      if (!user) return;
-      try {
-        const success = await changePassword(currentPassword, newPassword);
-        if (success) {
-          toast.success('Contraseña actualizada exitosamente');
-          setCurrentPassword('');
-          setNewPassword('');
-          setConfirmPassword('');
-          setErrors({});
-        } else {
-          setErrors({ currentPassword: 'Contraseña actual incorrecta.' });
-        }
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Error al conectar con el servidor. Intenta de nuevo.'
-        );
-      } finally {
-        setLoading(false);
+    // Intentar cambiar contraseña
+    if (!user) return;
+
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrors({});
+    } catch (error: any) {
+      if (error.message.includes('incorrecta') || error.message.includes('Unauthorized')) {
+        setErrors({ currentPassword: 'Contraseña actual incorrecta' });
+      } else {
+        setErrors({ currentPassword: error.message || 'Error al cambiar la contraseña' });
       }
-    })();
+    }
   };
 
   return (
@@ -78,7 +74,7 @@ export function ProfilePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Información del Usuario */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-6">
           <div className="bg-card p-6 rounded-xl shadow-md border border-border">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
@@ -87,6 +83,57 @@ export function ProfilePage() {
               <div>
                 <h2 className="text-foreground">{user?.name}</h2>
                 <p className="text-muted-foreground text-sm">{user?.email}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Apariencia */}
+          <div className="bg-card p-6 rounded-xl shadow-md border border-border">
+            <h2 className="text-foreground mb-4">Apariencia</h2>
+
+            <div>
+              <label className="block text-foreground mb-3">
+                Tema de la aplicación
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setTheme('light');
+                    toast.success('Tema actualizado a claro');
+                  }}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    theme === 'light'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-input-background hover:border-primary/50'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Sun className={`w-6 h-6 ${theme === 'light' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className={`text-sm ${theme === 'light' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                      Claro
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setTheme('dark');
+                    toast.success('Tema actualizado a oscuro');
+                  }}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    theme === 'dark'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-input-background hover:border-primary/50'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Moon className={`w-6 h-6 ${theme === 'dark' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className={`text-sm ${theme === 'dark' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                      Oscuro
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
@@ -211,17 +258,9 @@ export function ProfilePage() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Actualizando...
-                  </>
-                ) : (
-                  'Actualizar contraseña'
-                )}
+                Actualizar contraseña
               </button>
             </form>
           </div>

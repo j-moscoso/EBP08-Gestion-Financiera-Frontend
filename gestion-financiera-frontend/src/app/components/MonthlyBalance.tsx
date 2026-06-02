@@ -1,6 +1,5 @@
 import { TrendingUp, TrendingDown, Calendar, Sparkles } from 'lucide-react';
 import type { Transaction } from '../types';
-import { parseYmdLocal } from '../lib/calendarDate';
 
 interface MonthlyBalanceProps {
   transactions: Transaction[];
@@ -29,10 +28,10 @@ export function MonthlyBalance({ transactions, month }: MonthlyBalanceProps) {
   };
 
   const formatMonth = (monthStr: string) => {
-    const date = parseYmdLocal(`${monthStr}-01`);
+    const date = new Date(monthStr + '-01');
     return date.toLocaleDateString('es-ES', {
       month: 'long',
-      year: 'numeric',
+      year: 'numeric'
     });
   };
 

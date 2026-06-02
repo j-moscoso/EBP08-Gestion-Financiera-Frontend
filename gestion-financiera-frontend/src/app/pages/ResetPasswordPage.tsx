@@ -18,7 +18,6 @@ export function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [tokenExpired, setTokenExpired] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const validatePassword = (password: string) => {
     return password.length >= 8;
@@ -43,26 +42,18 @@ export function ResetPasswordPage() {
       return;
     }
 
-    setLoading(true);
+    // Intentar restablecer contraseña
+    const result = resetPassword(token, newPassword);
 
-    void (async () => {
-      try {
-        const result = await resetPassword(token, newPassword);
-        if (result) {
-          setSuccess(true);
-          toast.success('Contraseña restablecida exitosamente');
-          setTimeout(() => {
-            navigate('/login');
-          }, 2000);
-        } else {
-          setTokenExpired(true);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudo restablecer la contraseña');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    if (result) {
+      setSuccess(true);
+      toast.success('Contraseña restablecida exitosamente');
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+    } else {
+      setTokenExpired(true);
+    }
   };
 
   if (tokenExpired) {
@@ -221,10 +212,9 @@ export function ResetPasswordPage() {
 
             <button
               type="submit"
-              disabled={loading}
               className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:opacity-90 transition-opacity"
             >
-              {loading ? 'Restableciendo...' : 'Restablecer contraseña'}
+              Restablecer contraseña
             </button>
           </form>
         </div>

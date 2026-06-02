@@ -7,7 +7,7 @@ import { AppLogo } from '../components/AppLogo';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { user, validateLogin } = useApp();
+  const { user, loginWithCredentials } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,8 +21,7 @@ export function LoginPage() {
     }
   }, [user, navigate]);
 
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validación básica
@@ -32,26 +31,17 @@ export function LoginPage() {
     }
 
     setLoading(true);
+    setError('');
 
-    void (async () => {
-      try {
-        const authenticated = await validateLogin(email, password.trim());
-        if (!authenticated) {
-          setError('No se pudo completar el inicio de sesión.');
-          return;
-        }
-        toast.success('¡Bienvenido!');
-        navigate('/');
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Correo electrónico o contraseña incorrectos. Si no tienes cuenta, regístrate primero.',
-        );
-      } finally {
-        setLoading(false);
-      }
-    })();
+    try {
+      await loginWithCredentials(email, password);
+      toast.success('¡Bienvenido!');
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'Correo electrónico o contraseña incorrectos');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -96,7 +86,7 @@ export function LoginPage() {
                   Contraseña
                 </label>
                 <Link
-                  to="/forgot-password"
+                  to={`/recovery-code-login${email ? `?email=${encodeURIComponent(email)}` : ''}`}
                   className="text-sm text-primary hover:underline"
                 >
                   ¿Olvidaste tu contraseña?

@@ -1,14 +1,13 @@
 import { Outlet, useNavigate, useLocation, Link } from 'react-router';
 import { LogOut, LayoutDashboard, Target, FolderOpen, Menu, X, TrendingUp, TrendingDown, User, Lightbulb, FileText } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import * as api from '../services/api';
 import { useState, useEffect } from 'react';
 import { AppLogo } from '../components/AppLogo';
 
 export function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, setUser } = useApp();
+  const { user, logout } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Redirigir a login si no hay usuario
@@ -22,13 +21,9 @@ export function DashboardLayout() {
     return null;
   }
 
-  const handleLogout = () => {
-    void (async () => {
-      await api.logoutUsuarioRemoto().catch(() => undefined);
-      api.clearAuth();
-      setUser(null);
-      navigate('/login');
-    })();
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   const navItems = [
@@ -83,8 +78,11 @@ export function DashboardLayout() {
             </nav>
 
             {/* User Actions */}
-            <div className="flex items-center gap-2">
-              <button onClick={handleLogout} className="hidden lg:flex items-center gap-2 px-3 py-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors">
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleLogout}
+                className="hidden lg:flex items-center gap-2 px-3 py-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+              >
                 <LogOut className="w-5 h-5" />
                 <span className="text-sm">Cerrar sesión</span>
               </button>

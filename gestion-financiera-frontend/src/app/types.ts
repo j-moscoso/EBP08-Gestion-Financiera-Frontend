@@ -23,10 +23,7 @@ export interface Category {
   name: string;
   icon: string;
   isDefault?: boolean;
-  /** Categorías del sistema / globales del backend (no editables vía API) */
-  readonly?: boolean;
-  /** Solo uso interno: descripción sincronizada con el backend al editar */
-  descripcionBackend?: string;
+  backendId?: number; // ID del backend para sincronización con la API
 }
 
 export interface Budget {
@@ -36,8 +33,6 @@ export interface Budget {
   spent: number;
   categoryId?: string; // undefined = presupuesto global
   month: string; // formato: "2026-03" (YYYY-MM)
-  /** Texto informativo del API (ej. `mensaje` del resumen global). */
-  description?: string;
 }
 
 export interface User {

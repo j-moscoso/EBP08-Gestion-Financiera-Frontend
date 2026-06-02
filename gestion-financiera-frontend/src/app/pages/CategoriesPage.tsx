@@ -3,6 +3,7 @@ import { Plus, FolderOpen, Pencil, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 import type { Category } from '../types';
+import { createCategory, updateCategory as apiUpdateCategory, deleteCategory as apiDeleteCategory } from '../services/api';
 
 export function CategoriesPage() {
   const { categories, addCategory, updateCategory, deleteCategory, transactions, scheduledTransactions } = useApp();
@@ -12,7 +13,7 @@ export function CategoriesPage() {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('📁');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name) {
@@ -20,32 +21,48 @@ export function CategoriesPage() {
       return;
     }
 
-    void (async () => {
-      try {
-        if (editingCategory) {
-          await updateCategory(editingCategory.id, {
-            name,
-            icon,
-            descripcionBackend: editingCategory.descripcionBackend ?? name,
-          });
-          toast.success('Información actualizada');
-          setEditingCategory(null);
-        } else {
-          await addCategory({ name, icon });
-          toast.success('Categoría creada exitosamente');
+    // Nombre interno: concatenación de nombre + emoji para que el backend persista el icono
+    const nombreInterno = icon ? `${name} ${icon}` : name;
+
+    try {
+      if (editingCategory) {
+        if (editingCategory.backendId) {
+          await apiUpdateCategory(editingCategory.backendId, nombreInterno, '');
         }
-        setName('');
-        setIcon('📁');
-        setShowForm(false);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'No se pudo guardar la categoría');
+        updateCategory(editingCategory.id, { name: nombreInterno, icon });
+        toast.success('Información actualizada');
+        setEditingCategory(null);
+      } else {
+        const backendCategory = await createCategory(nombreInterno, '');
+        addCategory({ name: nombreInterno, icon, backendId: backendCategory.id });
+        toast.success('Categoría creada exitosamente');
       }
-    })();
+    } catch {
+      // Si falla el backend, igual actualizamos el estado local
+      if (editingCategory) {
+        updateCategory(editingCategory.id, { name: nombreInterno, icon });
+        toast.success('Información actualizada (local)');
+        setEditingCategory(null);
+      } else {
+        addCategory({ name: nombreInterno, icon });
+        toast.success('Categoría creada exitosamente (local)');
+      }
+    }
+
+    // Reset form
+    setName('');
+    setIcon('📁');
+    setShowForm(false);
   };
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
-    setName(category.name);
+    // Si el nombre ya tiene el emoji al final, extraer solo el texto base para edición
+    const nameParts = category.name.trimEnd();
+    const lastSpaceIdx = nameParts.lastIndexOf(' ');
+    const possibleEmoji = lastSpaceIdx >= 0 ? nameParts.slice(lastSpaceIdx + 1) : '';
+    const isEmojiSuffix = possibleEmoji === category.icon && possibleEmoji.length > 0;
+    setName(isEmojiSuffix ? nameParts.slice(0, lastSpaceIdx) : category.name);
     setIcon(category.icon);
     setShowForm(true);
   };
@@ -54,18 +71,20 @@ export function CategoriesPage() {
     setDeletingCategory(category);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deletingCategory) return;
 
-    void (async () => {
-      try {
-        await deleteCategory(deletingCategory.id);
-        toast.success('Categoría eliminada');
-        setDeletingCategory(null);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'No se pudo eliminar la categoría');
+    try {
+      if (deletingCategory.backendId) {
+        await apiDeleteCategory(deletingCategory.backendId);
       }
-    })();
+    } catch {
+      // Si falla el backend, igual eliminamos localmente
+    }
+
+    deleteCategory(deletingCategory.id);
+    toast.success('Categoría eliminada');
+    setDeletingCategory(null);
   };
 
   const getCategoryUsageCount = (categoryId: string) => {
@@ -211,7 +230,7 @@ export function CategoriesPage() {
                         Por defecto
                       </span>
                     )}
-                    {!category.readonly && (
+                    {!category.isDefault && (
                       <div className="flex items-center gap-2 mt-3">
                         <button
                           onClick={() => handleEdit(category)}
@@ -247,7 +266,7 @@ export function CategoriesPage() {
               <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
                 <p className="text-foreground text-sm">
                   Esta categoría está en uso en {getCategoryUsageCount(deletingCategory.id)} transacción(es).
-                  Las transacciones se moverán a la categoría global OTROS.
+                  Las transacciones se moverán a la categoría "Sin categoría".
                 </p>
               </div>
             ) : (

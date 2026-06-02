@@ -1,0 +1,288 @@
+DOCUMENTACION TECNICA BACKEND PARA FIGMA MAKE
+Dashboard Financiero - Backend existente
+
+OBJETIVO DEL DOCUMENTO
+Este archivo resume lo que ya existe en el backend funcional del proyecto para que Figma Make solo adapte el diseño visual, estados de componentes y modales, sin inventar nuevas arquitecturas, flujos ni campos.
+
+ALCANCE ACTUAL DEL BACKEND
+El backend ya contempla estas areas funcionales:
+- Usuarios y autenticacion.
+- Categorias personalizadas.
+- Transacciones de ingresos y gastos.
+- Presupuestos globales y por categoria.
+- Alertas asociadas a presupuesto.
+- Transacciones programadas.
+- Recomendaciones por balance.
+
+ESTRUCTURA GENERAL
+- Aplicacion Spring Boot.
+- Base de rutas REST bajo prefijo /api.
+- Las respuestas usan entidades del dominio o DTOs especificos segun el caso.
+- La logica de negocio ya existe; no se debe redefinir en Figma Make.
+
+ENDPOINTS EXISTENTES
+1. Usuarios
+- POST /api/usuarios/registro
+  Crea usuario.
+- POST /api/usuarios/login
+  Devuelve token JWT como String.
+- POST /api/usuarios/logout
+  Cierra sesion.
+- PUT /api/usuarios/actualizarClave
+  Actualiza clave.
+
+2. Categorias
+- POST /api/categorias/crearCategoriaPropia
+  Crea categoria personalizada.
+- GET /api/categorias/usuario
+  Lista categorias del usuario autenticado.
+- PUT /api/categorias/actualizarCategoriaPropia/{idCategoria}
+  Actualiza categoria personalizada.
+- DELETE /api/categorias/eliminarCategoriaPropia/{idCategoria}
+  Elimina categoria personalizada.
+
+3. Transacciones
+- POST /api/transacciones
+  Crea transaccion.
+- GET /api/transacciones/usuario
+  Lista transacciones del usuario.
+- GET /api/transacciones/usuario/ingresos
+  Lista ingresos recientes.
+- GET /api/transacciones/usuario/gastos
+  Lista gastos recientes.
+- PUT /api/transacciones/{idTransaccion}/usuario
+  Actualiza transaccion.
+- DELETE /api/transacciones/{idTransaccion}/usuario
+  Elimina transaccion.
+
+4. Presupuestos
+- POST /api/presupuestos/global
+  Crea presupuesto global.
+- POST /api/presupuestos/categoria
+  Crea presupuesto por categoria.
+- GET /api/presupuestos/global/usuario
+  Devuelve resumen de presupuesto global.
+- GET /api/presupuestos/categorias/usuario
+  Devuelve resumen de presupuestos por categoria.
+
+5. Alertas
+- GET /api/alertas/usuario
+  Devuelve historial de alertas del usuario.
+
+6. Transacciones programadas
+- POST /api/transacciones-programadas/usuario
+  Crea transaccion programada.
+- PUT /api/transacciones-programadas/usuario/{id}
+  Actualiza transaccion programada.
+- DELETE /api/transacciones-programadas/usuario/{id}
+  Elimina transaccion programada.
+- GET /api/transacciones-programadas/usuario/ingresosProgramados
+  Lista ingresos programados.
+- GET /api/transacciones-programadas/usuario/egresosProgramados
+  Lista egresos programados.
+
+7. Recomendaciones
+- GET /api/recomendaciones/balance
+  Devuelve recomendaciones textuales basadas en el balance mensual.
+
+DTOs Y CAMPOS REALES
+1. CrearTransaccionRequest
+- idCategoria
+- tipo
+- descripcion
+- monto
+
+2. ActualizarTransaccionRequest
+- idCategoria
+- tipo
+- descripcion
+- monto
+
+3. TransaccionResponse
+- transaccion
+- alertasGeneradas
+
+4. CrearPresupuestoGlobalRequest
+- montoLimite
+
+5. CrearPresupuestoCategoriaRequest
+- idCategoria
+- montoLimite
+
+6. ResumenPresupuestoGlobalResponse
+- presupuestoDefinido
+- idPresupuesto
+- montoLimite
+- gastado
+- disponible
+- porcentajeUso
+- fechaLimite
+- mensaje
+
+7. ResumenPresupuestoCategoriaResponse
+- idPresupuesto
+- idCategoria
+- nombreCategoria
+- montoLimite
+- gastado
+- disponible
+- porcentajeUso
+- fechaLimite
+
+8. AlertaResponse
+- alertas
+
+9. AlertaResumenResponse
+- id
+- presupuestoId
+- tipo
+- mensaje
+- fecha
+
+10. CrearCategoriaRequest
+- nombre
+- descripcion
+
+11. ActualizarCategoriaRequest
+- nombre
+- descripcion
+
+12. CrearTransaccionProgramadaRequest
+- monto
+- descripcion
+- fechaInicio
+- fechaFin
+- frecuencia
+- tipo
+- idCategoria
+
+13. ActualizarTransaccionProgramadaRequest
+- monto
+- descripcion
+- fechaInicio
+- fechaFin
+- frecuencia
+- estado
+
+14. RegistroRequest
+- nombre
+- correo
+- clave
+
+15. LoginRequest
+- correo
+- clave
+
+16. ActualizarClaveRequest
+- claveAntigua
+- claveNueva
+
+ENTIDADES DE DOMINIO YA EXISTENTES
+1. Transaccion
+- id
+- usuario
+- categoria
+- tipo
+- monto
+- fecha
+- descripcion
+
+2. Presupuesto
+- id
+- usuario
+- categoria
+- montoLimite
+- fechaLimite
+
+3. Alerta
+- id
+- usuario
+- presupuesto
+- tipo
+- mensaje
+- fecha
+
+4. TransaccionProgramada
+- id
+- usuario
+- categoria
+- tipo
+- frecuencia
+- estado
+- monto
+- descripcion
+- fechaInicio
+- fechaFin
+- ultimaEjecucion
+
+5. Categoria
+- id
+- nombre
+- descripcion
+- usuario
+
+ENUMS REALES
+1. TipoTransaccion
+- INGRESO
+- EGRESO
+
+2. FrecuenciaTransaccion
+- DIARIA
+- SEMANAL
+- MENSUAL
+
+3. Estado
+- ACTIVO
+- INACTIVO
+
+4. TipoAlerta
+- PROXIMIDAD
+- SOBREPASO
+
+IMPLICACIONES PARA Figma Make
+1. Sistema de Alertas de Presupuesto
+- El backend no expone un flag visual de UI, pero si entrega datos suficientes para decidir el estado.
+- Fuente principal para el resumen visual: GET /api/presupuestos/global/usuario.
+- Si presupuestoDefinido es false, el estado debe permanecer limpio, sin banner.
+- Si presupuestoDefinido es true y el gasto supera el montoLimite o existe una alerta tipo SOBREPASO en GET /api/alertas/usuario, se puede mostrar un banner sutil de alerta.
+- Campos utiles para el texto y el progreso: montoLimite, gastado, disponible, porcentajeUso, mensaje.
+
+2. Edicion y eliminacion de filas de ingresos y gastos
+- Las listas de transacciones ya existen en:
+  - GET /api/transacciones/usuario/ingresos
+  - GET /api/transacciones/usuario/gastos
+- El formulario de edicion debe reutilizar exactamente estos campos:
+  - idCategoria
+  - tipo
+  - descripcion
+  - monto
+- Al guardar con exito, la respuesta del backend es una Transaccion actualizada.
+- Para un estado de exito visual, Figma Make puede representar un toast con el texto "Informacion actualizada".
+- Si el backend responde validacion fallida, el mock visual puede mostrar "Datos invalidos" debajo de los campos afectados.
+- Al eliminar, el backend responde 204 No Content, por lo que la fila debe desaparecer de la lista.
+
+3. Confirmacion de eliminacion
+- El modal de confirmacion debe usar el texto "Estas seguro?".
+- Botones sugeridos por el prompt:
+  - Confirmar
+  - Cancelar
+- Tras la confirmacion, el Balance General debe reflejar el estado actualizado usando los datos de presupuesto o transacciones que ya existen en el backend.
+
+MAPEO RECOMENDADO PARA COMPONENTES Figma
+- Banner de alerta de presupuesto: ligado al resumen global de presupuesto y al historial de alertas.
+- Fila de transaccion: debe soportar estado Default, Hover, Active, Error y Success.
+- Acciones en fila: iconos de editar y eliminar visibles en Hover.
+- Modal de edicion: campos basados en CrearTransaccionRequest y ActualizarTransaccionRequest.
+- Modal de eliminacion: confirmacion destructiva con estado posterior sin la fila.
+- Toast de exito: usarlo despues de una actualizacion exitosa.
+- Estado de error de validacion: mostrar mensajes de campo inline.
+
+NOTAS DE INTEGRACION
+- No crear campos nuevos que no existan en los DTOs o entidades listados.
+- No cambiar nombres de campos al diseñar etiquetas, placeholders o bindings.
+- No proponer flujos alternos que contradigan los endpoints actuales.
+- Usar Auto Layout para los componentes y sus variantes de estado.
+- Mantener los entregables como componentes interactivos o frames de flujo de usuario bien nombrados en Figma.
+
+RESUMEN EJECUTIVO
+El backend ya soporta la gestion de usuarios, categorias, transacciones, presupuestos, alertas, transacciones programadas y recomendaciones. Para las tres historias de usuario solicitadas, Figma Make debe limitarse a construir la capa visual y los estados interactivos conectados a estos contratos reales, especialmente los campos idCategoria, tipo, descripcion, monto, montoLimite, gastado, disponible, porcentajeUso, presupuestoDefinido, tipo de alerta y los estados tipo/frecuencia/estado ya definidos.

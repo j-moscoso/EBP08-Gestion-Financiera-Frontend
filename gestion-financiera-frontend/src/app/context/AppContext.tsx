@@ -1,445 +1,453 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Transaction, Category, Budget, User, ScheduledTransaction } from '../types';
-import type {
-  BackendCategoria,
-  BackendTransaccion,
-  BackendTransaccionProgramada,
-  FrecuenciaTransaccionApi,
-  ResumenPresupuestoCategoria,
-  ResumenPresupuestoGlobal,
-  TipoTransaccionApi,
-} from '../services/api';
 import * as api from '../services/api';
-import { apiDateToLocalYmd } from '../lib/calendarDate';
-
-const ICON_FALLBACK = ['📁', '💼', '🏠', '🍔', '💳', '🎯', '📌', '🧾'];
-
-function toNumber(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const n = Number(value.replace(/\s/g, '').replace(',', '.'));
-    return Number.isFinite(n) ? n : 0;
-  }
-  return 0;
-}
-
-function pickIconForName(name: string): string {
-  const hash = [...name].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  return ICON_FALLBACK[hash % ICON_FALLBACK.length] ?? '📁';
-}
-
-function mapBackendCategory(c: BackendCategoria): Category {
-  const isGlobal = c.usuario == null;
-  const isDefaultCat = c.nombre.trim().toUpperCase() === 'OTROS';
-  return {
-    id: String(c.id),
-    name: c.nombre,
-    descripcionBackend: c.descripcion,
-    icon: isGlobal ? '🌐' : pickIconForName(c.nombre),
-    isDefault: isDefaultCat,
-    readonly: isGlobal,
-  };
-}
-
-function mapBackendTransaction(tx: BackendTransaccion): Transaction {
-  const dateSlice = apiDateToLocalYmd(tx.fecha ?? null);
-  const categoryId =
-    tx.categoria?.id !== undefined ? String(tx.categoria.id) : '';
-
-  const kind: Transaction['type'] =
-    tx.tipo === 'INGRESO' ? 'income' : 'expense';
-
-  return {
-    id: String(tx.id),
-    description: tx.descripcion?.trim() || '—',
-    amount: toNumber(tx.monto),
-    type: kind,
-    categoryId,
-    date: dateSlice,
-  };
-}
-
-function mapFrequencyToFrontend(
-  f: FrecuenciaTransaccionApi,
-): ScheduledTransaction['frequency'] {
-  switch (f) {
-    case 'DIARIA':
-      return 'daily';
-    case 'SEMANAL':
-      return 'weekly';
-    case 'MENSUAL':
-    default:
-      return 'monthly';
-  }
-}
-
-function mapFrequencyToApi(
-  f: ScheduledTransaction['frequency'],
-): FrecuenciaTransaccionApi {
-  switch (f) {
-    case 'daily':
-      return 'DIARIA';
-    case 'weekly':
-      return 'SEMANAL';
-    case 'yearly':
-    case 'monthly':
-    default:
-      return 'MENSUAL';
-  }
-}
-
-function mapScheduledFromApi(p: BackendTransaccionProgramada): ScheduledTransaction {
-  const start = p.fechaInicio ? apiDateToLocalYmd(p.fechaInicio) : '';
-  const fin = p.fechaFin ? apiDateToLocalYmd(p.fechaFin) : start;
-  return {
-    id: String(p.id),
-    description: p.descripcion?.trim() || '—',
-    amount: toNumber(p.monto),
-    type: p.tipo === 'INGRESO' ? 'income' : 'expense',
-    categoryId: String(p.categoria?.id ?? ''),
-    startDate: start,
-    endDate: fin,
-    frequency: mapFrequencyToFrontend(p.frecuencia),
-  };
-}
-
-function buildBudgetsFromApi(
-  global: ResumenPresupuestoGlobal,
-  categorias: ResumenPresupuestoCategoria[],
-): Budget[] {
-  const list: Budget[] = [];
-
-  const msgGlobal = global.mensaje?.trim();
-
-  if (global.presupuestoDefinido && global.montoLimite != null && global.fechaLimite) {
-    const monthSlice = apiDateToLocalYmd(global.fechaLimite).slice(0, 7);
-    list.push({
-      id: `global-${monthSlice}`,
-      name: 'Presupuesto mensual global',
-      amount: toNumber(global.montoLimite),
-      spent: toNumber(global.gastado),
-      categoryId: undefined,
-      month: monthSlice,
-      description: msgGlobal || undefined,
-    });
-  }
-
-  for (const row of categorias) {
-    if (!row.fechaLimite) continue;
-    const monthSlice = apiDateToLocalYmd(row.fechaLimite).slice(0, 7);
-    list.push({
-      id: `cat-${row.idCategoria}-${monthSlice}`,
-      name: `${row.nombreCategoria}`,
-      amount: toNumber(row.montoLimite),
-      spent: toNumber(row.gastado),
-      categoryId: String(row.idCategoria),
-      month: monthSlice,
-    });
-  }
-
-  return list;
-}
-
-function mapUsuarioRegistro(u: api.BackendUsuario): User {
-  return {
-    id: String(u.id),
-    name: u.nombre,
-    email: u.correo,
-  };
-}
-
-function userFromJwtAndStored(jwtCorreo: string): User {
-  const stored = api.getStoredUser();
-  const emailNorm = jwtCorreo.trim().toLowerCase();
-  if (stored && stored.email.trim().toLowerCase() === emailNorm) {
-    return { id: stored.id, name: stored.name, email: stored.email };
-  }
-  const local = jwtCorreo.split('@')[0] || jwtCorreo;
-  const pretty = local.length > 0 ? local.charAt(0).toUpperCase() + local.slice(1) : jwtCorreo;
-
-  return { id: '0', name: pretty, email: jwtCorreo };
-}
+import {
+  mapBackendCategory,
+  mapBackendTransaction,
+  mapBackendScheduledTransaction,
+  mapBackendBudget,
+  mapFrontendTransactionType,
+  mapFrontendFrequency,
+  getCategoryBackendId,
+  mapBackendUser,
+} from '../services/mappers';
+import { toast } from 'sonner';
 
 interface AppContextType {
   user: User | null;
   setUser: (user: User | null) => void;
-  registerAndSignIn: (name: string, email: string, password: string) => Promise<User>;
-  validateLogin: (email: string, password: string) => Promise<User | null>;
-  changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
-  recoverPassword: (email: string, code: string) => Promise<string>;
-  resetPassword: (token: string, newPassword: string) => Promise<boolean>;
+  loginWithCredentials: (email: string, password: string) => Promise<User>;
+  logout: () => Promise<void>;
+  loadUserData: () => Promise<void>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   transactions: Transaction[];
-  setTransactions: (transactions: Transaction[]) => void;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
+  updateTransaction: (id: string, transaction: Partial<Omit<Transaction, 'id'>>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
   scheduledTransactions: ScheduledTransaction[];
-  setScheduledTransactions: (transactions: ScheduledTransaction[]) => void;
   addScheduledTransaction: (transaction: Omit<ScheduledTransaction, 'id'>) => Promise<void>;
-  updateScheduledTransaction: (
-    id: string,
-    transaction: Partial<ScheduledTransaction>,
-  ) => Promise<void>;
+  updateScheduledTransaction: (id: string, transaction: Partial<ScheduledTransaction>) => Promise<void>;
   deleteScheduledTransaction: (id: string) => Promise<void>;
   categories: Category[];
-  setCategories: (categories: Category[]) => void;
   addCategory: (category: Omit<Category, 'id'>) => Promise<void>;
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   budgets: Budget[];
-  setBudgets: (budgets: Budget[]) => void;
-  /** Último resumen global del API (sirve sobre todo para `mensaje` cuando no hay presupuesto definido). */
-  resumenPresupuestoGlobal: ResumenPresupuestoGlobal | null;
   addBudget: (budget: Omit<Budget, 'id'>) => Promise<void>;
-  updateBudget: (id: string, budget: Partial<Budget>) => void;
-  refreshFromBackend: () => Promise<void>;
+  updateBudget: (id: string, budget: Partial<Budget>) => Promise<void>;
+  loading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-function readStoredSessionUser(): User | null {
-  const tok = api.getToken();
-  const saved = api.getStoredUser();
-  if (!tok || !saved) return null;
-  return { id: saved.id, name: saved.name, email: saved.email };
-}
-
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => readStoredSessionUser());
+  const [user, setUser] = useState<User | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [scheduledTransactions, setScheduledTransactions] = useState<ScheduledTransaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [resumenPresupuestoGlobal, setResumenPresupuestoGlobal] =
-    useState<ResumenPresupuestoGlobal | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const syncFromBackend = useCallback(async () => {
-    if (!api.getToken()) return;
-
-    const [rawCats, rawTx, globalRes, catsB, incP, egP] = await Promise.all([
-      api.listarCategoriasUsuario(),
-      api.listarTransaccionesUsuario(),
-      api.obtenerResumenPresupuestoGlobal(),
-      api.obtenerResumenPresupuestosCategoria(),
-      api.listarIngresosProgramadosApi(),
-      api.listarEgresosProgramadosApi(),
-    ]);
-
-    setCategories(rawCats.map(mapBackendCategory));
-
-    rawTx.sort((a, b) => {
-      const da = String(a.fecha ?? '');
-      const db = String(b.fecha ?? '');
-      return db.localeCompare(da);
-    });
-    setTransactions(rawTx.map(mapBackendTransaction));
-    setResumenPresupuestoGlobal(globalRes);
-    setBudgets(buildBudgetsFromApi(globalRes, catsB));
-
-    const combined = [...incP, ...egP].map(mapScheduledFromApi);
-    setScheduledTransactions(combined);
+  // Cargar usuario desde localStorage al iniciar
+  useEffect(() => {
+    const storedUser = api.getStoredUser();
+    if (storedUser) {
+      setUser(mapBackendUser(storedUser));
+      loadUserData();
+    }
   }, []);
 
-  const refreshFromBackend = useCallback(async () => {
+  // Función para iniciar sesión
+  const loginWithCredentials = async (email: string, password: string): Promise<User> => {
+    setLoading(true);
     try {
-      await syncFromBackend();
-    } catch {
-      throw new Error('No se pudieron cargar los datos del servidor.');
-    }
-  }, [syncFromBackend]);
-
-  useEffect(() => {
-    if (!user || !api.getToken()) return;
-    syncFromBackend().catch(() => {
-      /** Error de red: no cerramos sesión automáticamente; el usuario puede reintentar al navegar */
-    });
-  }, [user, syncFromBackend]);
-
-  const txToTipo = (kind: Transaction['type']): TipoTransaccionApi =>
-    kind === 'income' ? 'INGRESO' : 'EGRESO';
-
-  const addTransaction = async (payload: Omit<Transaction, 'id'>) => {
-    const cid = payload.categoryId ? Number(payload.categoryId) : undefined;
-
-    await api.crearTransaccion({
-      idCategoria:
-        cid !== undefined &&
-        cid !== null &&
-        !Number.isNaN(cid) &&
-        payload.categoryId !== ''
-          ? cid
-          : undefined,
-      tipo: txToTipo(payload.type),
-      monto: payload.amount,
-      descripcion: payload.description,
-    });
-    await syncFromBackend().catch(() => undefined);
-  };
-
-  const registerAndSignIn = async (
-    name: string,
-    email: string,
-    password: string,
-  ): Promise<User> => {
-    // Primero crear el usuario
-    const created = await api.registerUsuario(name.trim(), email.trim(), password);
-    // Persistir códigos de recuperación si vienen
-    try {
-      api.saveRecoveryCodes(created.codigosRecuperacion ?? []);
-    } catch {
-      // ignore storage errors
-    }
-
-    // Intentar iniciar sesión automáticamente; si falla, informamos
-    try {
-      const token = await api.loginUsuario(email.trim(), password);
+      // Obtener token
+      const token = await api.loginUser(email, password);
       api.saveAuthToken(token);
-    } catch (err) {
-      const appUser = mapUsuarioRegistro(created.usuario);
-      // Guardar usuario parcialmente (no autenticado)
-      api.saveUser({ id: appUser.id, name: appUser.name, email: appUser.email });
-      setUser(appUser);
-      throw new Error(
-        `Registro creado correctamente, pero no fue posible iniciar sesión automáticamente: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
 
-    const appUser = mapUsuarioRegistro(created.usuario);
-    api.saveUser({
-      id: appUser.id,
-      name: appUser.name,
-      email: appUser.email,
-    });
-    // Guardar usuario en estado; la sincronización con el backend
-    // se realiza desde el efecto `useEffect` que escucha `user`.
-    setUser(appUser);
-    return appUser;
-  };
+      // Cargar categorías para obtener información del usuario
+      const backendCategories = await api.getUserCategories();
 
-  const validateLogin = async (
-    email: string,
-    password: string,
-  ): Promise<User | null> => {
-    const token = await api.loginUsuario(email.trim(), password);
-    api.saveAuthToken(token);
-    const sub = api.decodeJwtSubject(token);
-    if (!sub) {
-      api.clearAuth();
-      return null;
-    }
-    const appUser = userFromJwtAndStored(sub);
-    api.saveUser({
-      id: appUser.id,
-      name: appUser.name,
-      email: appUser.email,
-    });
-    // Guardar usuario en estado; `syncFromBackend` será lanzado
-    // automáticamente por el efecto que escucha cambios en `user`.
-    setUser(appUser);
-    return appUser;
-  };
+      // El usuario viene en las categorías, extraerlo de ahí
+      const backendUser = backendCategories.find(c => c.usuario)?.usuario;
 
-  const changePassword = async (
-    oldPassword: string,
-    newPassword: string,
-  ): Promise<boolean> => {
-    try {
-      await api.actualizarClaveUsuario(oldPassword, newPassword);
-      return true;
-    } catch (err) {
-      if (err instanceof Error) {
-        throw new Error(err.message);
+      if (backendUser) {
+        api.saveUser(backendUser);
+        const mappedUser = mapBackendUser(backendUser);
+        setUser(mappedUser);
+
+        // Cargar datos del usuario
+        await loadUserData();
+
+        return mappedUser;
+      } else {
+        throw new Error('No se pudo obtener información del usuario');
       }
-      throw new Error('No se pudo actualizar la contraseña. Intenta de nuevo.');
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const recoverPassword = async (email: string, code: string): Promise<string> => {
-    return api.recuperarPasswordUsuario(email.trim(), code.trim());
-  };
-
-  const resetPassword = async (token: string, newPassword: string): Promise<boolean> => {
-    await api.resetPasswordConTokenTemporal(token.trim(), newPassword);
-    return true;
-  };
-
-  const addScheduledTransaction = async (t: Omit<ScheduledTransaction, 'id'>) => {
-    const tipo: TipoTransaccionApi = t.type === 'income' ? 'INGRESO' : 'EGRESO';
-    await api.crearTransaccionProgramada({
-      monto: String(t.amount),
-      descripcion: t.description,
-      fechaInicio: t.startDate,
-      fechaFin: t.endDate || null,
-      frecuencia: mapFrequencyToApi(t.frequency),
-      tipo,
-      idCategoria: Number(t.categoryId),
-    });
-    await syncFromBackend().catch(() => undefined);
-  };
-
-  const updateScheduledTransaction = async (
-    id: string,
-    partial: Partial<ScheduledTransaction>,
-  ) => {
-    const body: Parameters<typeof api.actualizarTransaccionProgramada>[1] = {};
-    if (partial.amount !== undefined) body.monto = String(partial.amount);
-    if (partial.description !== undefined) body.descripcion = partial.description;
-    if (partial.startDate !== undefined) body.fechaInicio = partial.startDate;
-    if (partial.endDate !== undefined) body.fechaFin = partial.endDate || null;
-    if (partial.frequency !== undefined) body.frecuencia = mapFrequencyToApi(partial.frequency);
-
-    await api.actualizarTransaccionProgramada(Number(id), body);
-    await syncFromBackend().catch(() => undefined);
-  };
-
-  const deleteScheduledTransaction = async (id: string) => {
-    await api.eliminarTransaccionProgramada(Number(id));
-    await syncFromBackend().catch(() => undefined);
-  };
-
-  const addCategory = async (category: Omit<Category, 'id'>) => {
-    const desc = category.name.trim();
-    await api.crearCategoria(category.name.trim(), category.descripcionBackend || desc);
-    await syncFromBackend();
-  };
-
-  const updateCategory = async (id: string, fields: Partial<Category>) => {
-    const existing = categories.find((c) => c.id === id);
-    const cid = Number(id);
-    const name = (fields.name ?? existing?.name ?? '').trim();
-    if (!name) throw new Error('Nombre inválido');
-    const descripcion =
-      (fields.descripcionBackend ?? existing?.descripcionBackend ?? name).trim() || name;
-    await api.actualizarCategoriaPropia(cid, name, descripcion);
-    await syncFromBackend().catch(() => undefined);
-  };
-
-  const deleteCategory = async (id: string) => {
-    await api.eliminarCategoriaPropia(Number(id));
-    await syncFromBackend().catch(() => undefined);
-  };
-
-  const addBudget = async (budget: Omit<Budget, 'id'>) => {
-    const limit = Number(budget.amount);
-    if (!Number.isFinite(limit) || limit <= 0) throw new Error('Monto inválido');
-
-    if (budget.categoryId) {
-      await api.crearPresupuestoCategoriaApi(Number(budget.categoryId), limit);
-    } else {
-      await api.crearPresupuestoGlobalApi(limit);
+  // Función para cerrar sesión
+  const logout = async (): Promise<void> => {
+    try {
+      await api.logoutUser();
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    } finally {
+      api.clearAuth();
+      setUser(null);
+      setCategories([]);
+      setTransactions([]);
+      setScheduledTransactions([]);
+      setBudgets([]);
     }
-    await syncFromBackend().catch(() => undefined);
   };
 
-  const updateBudget = (id: string, budgetUpdate: Partial<Budget>) => {
-    setBudgets((budgets) => budgets.map((b) => (b.id === id ? { ...b, ...budgetUpdate } : b)));
+  // Función para cargar todos los datos del usuario
+  const loadUserData = async (): Promise<void> => {
+    setLoading(true);
+    try {
+      // Cargar categorías
+      const backendCategories = await api.getUserCategories();
+      const mappedCategories = backendCategories.map(mapBackendCategory);
+      setCategories(mappedCategories);
+
+      // Cargar transacciones
+      const backendTransactions = await api.getUserTransactions();
+      const mappedTransactions = backendTransactions.map(mapBackendTransaction);
+      setTransactions(mappedTransactions);
+
+      // Cargar transacciones programadas (ingresos + gastos)
+      const [backendIncomes, backendExpenses] = await Promise.all([
+        api.getScheduledIncomes(),
+        api.getScheduledExpenses(),
+      ]);
+      const mappedScheduled = [
+        ...backendIncomes.map(mapBackendScheduledTransaction),
+        ...backendExpenses.map(mapBackendScheduledTransaction),
+      ];
+      setScheduledTransactions(mappedScheduled);
+
+      // Cargar presupuestos (global + por categoría)
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const [globalBudget, categoryBudgets] = await Promise.all([
+        api.getGlobalBudgetSummary(),
+        api.getCategoryBudgetsSummary(),
+      ]);
+
+      const mappedBudgets: Budget[] = [];
+
+      // Presupuesto global
+      const globalMapped = mapBackendBudget(globalBudget, currentMonth);
+      if (globalMapped) {
+        mappedBudgets.push(globalMapped);
+      }
+
+      // Presupuestos por categoría
+      categoryBudgets.forEach(catBudget => {
+        const mapped = mapBackendBudget(catBudget, currentMonth);
+        if (mapped) {
+          mappedBudgets.push(mapped);
+        }
+      });
+
+      setBudgets(mappedBudgets);
+    } catch (error) {
+      console.error('Error al cargar datos del usuario:', error);
+      toast.error('Error al cargar los datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para cambiar contraseña
+  const changePassword = async (oldPassword: string, newPassword: string): Promise<void> => {
+    try {
+      await api.changePassword(oldPassword, newPassword);
+      toast.success('Contraseña actualizada correctamente');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar la contraseña');
+      throw error;
+    }
+  };
+
+  // ===== TRANSACCIONES =====
+
+  const addTransaction = async (transaction: Omit<Transaction, 'id'>): Promise<void> => {
+    try {
+      const categoryBackendId = getCategoryBackendId(transaction.categoryId, categories);
+      const backendType = mapFrontendTransactionType(transaction.type);
+
+      const result = await api.createTransaction(
+        categoryBackendId,
+        backendType,
+        transaction.amount.toString(),
+        transaction.description
+      );
+
+      const newTransaction = mapBackendTransaction(result.transaccion);
+      setTransactions([newTransaction, ...transactions]);
+
+      // Recargar presupuestos para reflejar el gasto
+      await loadBudgets();
+
+      toast.success('Transacción creada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al crear la transacción');
+      throw error;
+    }
+  };
+
+  const updateTransaction = async (id: string, transactionUpdate: Partial<Omit<Transaction, 'id'>>): Promise<void> => {
+    try {
+      const existing = transactions.find(t => t.id === id);
+      if (!existing) throw new Error('Transacción no encontrada');
+
+      const merged = { ...existing, ...transactionUpdate };
+      const categoryBackendId = getCategoryBackendId(merged.categoryId, categories);
+      const backendType = mapFrontendTransactionType(merged.type);
+
+      const updated = await api.updateTransaction(
+        parseInt(id),
+        categoryBackendId,
+        backendType,
+        merged.amount.toString(),
+        merged.description
+      );
+
+      const mappedTransaction = mapBackendTransaction(updated);
+      setTransactions(transactions.map(t => t.id === id ? mappedTransaction : t));
+
+      await loadBudgets();
+      toast.success('Transacción actualizada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar la transacción');
+      throw error;
+    }
+  };
+
+  const deleteTransaction = async (id: string): Promise<void> => {
+    try {
+      await api.deleteTransaction(parseInt(id));
+      setTransactions(transactions.filter(t => t.id !== id));
+
+      await loadBudgets();
+      toast.success('Transacción eliminada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al eliminar la transacción');
+      throw error;
+    }
+  };
+
+  // ===== TRANSACCIONES PROGRAMADAS =====
+
+  const addScheduledTransaction = async (transaction: Omit<ScheduledTransaction, 'id'>): Promise<void> => {
+    try {
+      const categoryBackendId = getCategoryBackendId(transaction.categoryId, categories);
+      const backendType = mapFrontendTransactionType(transaction.type);
+      const backendFrequency = mapFrontendFrequency(transaction.frequency);
+
+      const created = await api.createScheduledTransaction(
+        transaction.amount.toString(),
+        transaction.description,
+        transaction.startDate,
+        transaction.endDate,
+        backendFrequency,
+        backendType,
+        categoryBackendId
+      );
+
+      const newScheduled = mapBackendScheduledTransaction(created);
+      setScheduledTransactions([...scheduledTransactions, newScheduled]);
+      toast.success('Transacción programada creada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al crear la transacción programada');
+      throw error;
+    }
+  };
+
+  const updateScheduledTransaction = async (id: string, transactionUpdate: Partial<ScheduledTransaction>): Promise<void> => {
+    try {
+      const existing = scheduledTransactions.find(t => t.id === id);
+      if (!existing) throw new Error('Transacción programada no encontrada');
+
+      const merged = { ...existing, ...transactionUpdate };
+      const backendFrequency = mapFrontendFrequency(merged.frequency);
+
+      const updated = await api.updateScheduledTransaction(
+        parseInt(id),
+        merged.amount.toString(),
+        merged.description,
+        merged.startDate,
+        merged.endDate,
+        backendFrequency,
+        'ACTIVO'
+      );
+
+      const mappedScheduled = mapBackendScheduledTransaction(updated);
+      setScheduledTransactions(scheduledTransactions.map(t => t.id === id ? mappedScheduled : t));
+      toast.success('Transacción programada actualizada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar la transacción programada');
+      throw error;
+    }
+  };
+
+  const deleteScheduledTransaction = async (id: string): Promise<void> => {
+    try {
+      await api.deleteScheduledTransaction(parseInt(id));
+      setScheduledTransactions(scheduledTransactions.filter(t => t.id !== id));
+      toast.success('Transacción programada eliminada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al eliminar la transacción programada');
+      throw error;
+    }
+  };
+
+  // ===== CATEGORÍAS =====
+
+  const addCategory = async (category: Omit<Category, 'id'>): Promise<void> => {
+    try {
+      const created = await api.createCategory(
+        category.name,
+        category.icon // Usamos icon como descripción por ahora
+      );
+
+      const newCategory = mapBackendCategory(created);
+      setCategories([...categories, newCategory]);
+      toast.success('Categoría creada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al crear la categoría');
+      throw error;
+    }
+  };
+
+  const updateCategory = async (id: string, categoryUpdate: Partial<Category>): Promise<void> => {
+    try {
+      const existing = categories.find(c => c.id === id);
+      if (!existing || !existing.backendId) throw new Error('Categoría no encontrada');
+      if (existing.isDefault) throw new Error('No se pueden editar categorías predeterminadas');
+
+      const merged = { ...existing, ...categoryUpdate };
+      const updated = await api.updateCategory(
+        existing.backendId,
+        merged.name,
+        merged.icon
+      );
+
+      const mappedCategory = mapBackendCategory(updated);
+      setCategories(categories.map(c => c.id === id ? mappedCategory : c));
+      toast.success('Categoría actualizada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar la categoría');
+      throw error;
+    }
+  };
+
+  const deleteCategory = async (id: string): Promise<void> => {
+    try {
+      const existing = categories.find(c => c.id === id);
+      if (!existing || !existing.backendId) throw new Error('Categoría no encontrada');
+      if (existing.isDefault) throw new Error('No se pueden eliminar categorías predeterminadas');
+
+      await api.deleteCategory(existing.backendId);
+
+      // El backend mueve las transacciones a categoría por defecto automáticamente
+      setCategories(categories.filter(c => c.id !== id));
+
+      // Recargar transacciones para ver las actualizadas
+      await loadTransactions();
+      toast.success('Categoría eliminada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al eliminar la categoría');
+      throw error;
+    }
+  };
+
+  // ===== PRESUPUESTOS =====
+
+  const addBudget = async (budget: Omit<Budget, 'id'>): Promise<void> => {
+    try {
+      if (budget.categoryId) {
+        // Presupuesto por categoría
+        const categoryBackendId = getCategoryBackendId(budget.categoryId, categories);
+        await api.createOrUpdateCategoryBudget(categoryBackendId, budget.amount);
+      } else {
+        // Presupuesto global
+        await api.createOrUpdateGlobalBudget(budget.amount);
+      }
+
+      // Recargar presupuestos
+      await loadBudgets();
+      toast.success('Presupuesto creado');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al crear el presupuesto');
+      throw error;
+    }
+  };
+
+  const updateBudget = async (id: string, budgetUpdate: Partial<Budget>): Promise<void> => {
+    try {
+      const existing = budgets.find(b => b.id === id);
+      if (!existing) throw new Error('Presupuesto no encontrado');
+
+      const merged = { ...existing, ...budgetUpdate };
+
+      if (merged.categoryId) {
+        const categoryBackendId = getCategoryBackendId(merged.categoryId, categories);
+        await api.createOrUpdateCategoryBudget(categoryBackendId, merged.amount);
+      } else {
+        await api.createOrUpdateGlobalBudget(merged.amount);
+      }
+
+      await loadBudgets();
+      toast.success('Presupuesto actualizado');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar el presupuesto');
+      throw error;
+    }
+  };
+
+  // Helpers internos para recargar datos específicos
+  const loadBudgets = async () => {
+    try {
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const [globalBudget, categoryBudgets] = await Promise.all([
+        api.getGlobalBudgetSummary(),
+        api.getCategoryBudgetsSummary(),
+      ]);
+
+      const mappedBudgets: Budget[] = [];
+
+      const globalMapped = mapBackendBudget(globalBudget, currentMonth);
+      if (globalMapped) {
+        mappedBudgets.push(globalMapped);
+      }
+
+      categoryBudgets.forEach(catBudget => {
+        const mapped = mapBackendBudget(catBudget, currentMonth);
+        if (mapped) {
+          mappedBudgets.push(mapped);
+        }
+      });
+
+      setBudgets(mappedBudgets);
+    } catch (error) {
+      console.error('Error al cargar presupuestos:', error);
+    }
+  };
+
+  const loadTransactions = async () => {
+    try {
+      const backendTransactions = await api.getUserTransactions();
+      const mappedTransactions = backendTransactions.map(mapBackendTransaction);
+      setTransactions(mappedTransactions);
+    } catch (error) {
+      console.error('Error al cargar transacciones:', error);
+    }
   };
 
   return (
@@ -447,30 +455,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         setUser,
-        registerAndSignIn,
-        validateLogin,
+        loginWithCredentials,
+        logout,
+        loadUserData,
         changePassword,
-        recoverPassword,
-        resetPassword,
         transactions,
-        setTransactions,
         addTransaction,
+        updateTransaction,
+        deleteTransaction,
         scheduledTransactions,
-        setScheduledTransactions,
         addScheduledTransaction,
         updateScheduledTransaction,
         deleteScheduledTransaction,
         categories,
-        setCategories,
         addCategory,
         updateCategory,
         deleteCategory,
         budgets,
-        setBudgets,
-        resumenPresupuestoGlobal,
         addBudget,
         updateBudget,
-        refreshFromBackend,
+        loading,
       }}
     >
       {children}

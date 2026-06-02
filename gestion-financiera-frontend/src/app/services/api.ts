@@ -1,17 +1,8 @@
-/** Base URL debe incluir el prefijo `/api`. */
-const viteEnv = import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } };
-const RAW_BASE =
-  typeof viteEnv.env?.VITE_API_BASE_URL === 'string' &&
-  viteEnv.env.VITE_API_BASE_URL.trim().length > 0
-    ? viteEnv.env.VITE_API_BASE_URL.trim()
-    : 'https://eko-mj59.onrender.com/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://eko-mj59.onrender.com/api';
 
-export const BASE_URL = RAW_BASE.replace(/\/+$/, '');
+// ===== TIPOS DEL BACKEND =====
 
-export type TipoTransaccionApi = 'INGRESO' | 'EGRESO';
-export type FrecuenciaTransaccionApi = 'DIARIA' | 'SEMANAL' | 'MENSUAL';
-
-export interface BackendUsuario {
+export interface BackendUser {
   id: number;
   nombre: string;
   correo: string;
@@ -20,570 +11,605 @@ export interface BackendUsuario {
   estado?: string;
 }
 
-export interface BackendRegistroResponse {
-  usuario: BackendUsuario;
-  codigosRecuperacion: string[];
-}
-
-interface BackendUsuarioNested {
-  id: number;
-  nombre?: string;
-  correo?: string;
-}
-
-export interface BackendCategoria {
+export interface BackendCategory {
   id: number;
   nombre: string;
   descripcion: string;
-  usuario?: BackendUsuarioNested | null;
+  usuario?: BackendUser | null;
 }
 
-export interface BackendTransaccion {
+export interface BackendTransaction {
   id: number;
-  tipo: TipoTransaccionApi;
-  monto: number | string;
+  usuario?: BackendUser;
+  categoria?: BackendCategory;
+  tipo: 'INGRESO' | 'EGRESO';
   descripcion?: string;
-  fecha?: string;
-  categoria?: Pick<BackendCategoria, 'id' | 'nombre' | 'descripcion'> & {
-    usuario?: BackendUsuarioNested | null;
-  };
+  monto: number;
+  fecha: string;
 }
 
-export interface BackendTransaccionProgramada {
+export interface BackendScheduledTransaction {
   id: number;
-  tipo: TipoTransaccionApi;
-  frecuencia: FrecuenciaTransaccionApi;
-  monto: number | string;
+  usuario?: BackendUser;
+  categoria?: BackendCategory;
+  tipo: 'INGRESO' | 'EGRESO';
+  frecuencia: 'DIARIA' | 'SEMANAL' | 'MENSUAL' | 'ANUAL';
+  estado?: 'ACTIVO' | 'INACTIVO';
+  monto: number;
   descripcion?: string;
   fechaInicio: string;
-  fechaFin?: string | null;
-  estado?: string;
-  categoria?: { id?: number };
+  fechaFin: string;
+  ultimaEjecucion?: string | null;
 }
 
-export interface ReporteGastosCategoriaApi {
-  idCategoria: number;
-  nombreCategoria: string;
-  totalGastado: number | string;
-  cantidadTransacciones: number;
+export interface BackendBudget {
+  id: number;
+  usuario?: BackendUser;
+  categoria?: BackendCategory | null;
+  montoLimite: number;
+  fechaLimite?: string;
 }
 
-export interface ReporteIngresosCategoriaApi {
-  idCategoria: number;
-  nombreCategoria: string;
-  totalIngresado: number | string;
-  cantidadTransacciones: number;
-}
-
-export interface ResumenMensualApi {
-  totalIngresos: number | string;
-  totalEgresos: number | string;
-  balance: number | string;
-  porcentajeAhorro: number | string;
-  mes: number;
-  anio: number;
-}
-
-export interface ComparativoMensualApi {
-  nombreUsuario: string;
-  mes: number;
-  anio: number;
-  totalIngresos: number | string;
-  totalGastos: number | string;
-  balance: number | string;
-  estadoBalance: string;
-  montoDeficit: number | string;
-  porcentajeAhorro: number | string;
-  datosGrafico: {
-    ingresos: number | string;
-    gastos: number | string;
-  };
-  movimientosResumen: Array<{
-    fecha: string;
-    tipo: TipoTransaccionApi;
-    categoria: string;
-    monto: number | string;
-    descripcion?: string;
-  }>;
-}
-
-export interface ResumenPresupuestoGlobal {
+export interface BackendBudgetSummary {
   presupuestoDefinido: boolean;
-  montoLimite?: number | string | null;
-  gastado?: number | string | null;
-  disponible?: number | string | null;
-  porcentajeUso?: number | string | null;
-  fechaLimite?: string | null;
-  mensaje?: string | null;
+  idPresupuesto: number | null;
+  montoLimite: number | null;
+  gastado: number | null;
+  disponible: number | null;
+  porcentajeUso: number | null;
+  fechaLimite: string | null;
+  mensaje: string | null;
 }
 
-export interface ResumenPresupuestoCategoria {
+export interface BackendCategoryBudgetSummary {
+  idPresupuesto: number;
   idCategoria: number;
   nombreCategoria: string;
-  montoLimite: number | string;
-  gastado: number | string;
-  disponible?: number | string;
-  porcentajeUso?: number | string;
-  fechaLimite?: string | null;
+  montoLimite: number;
+  gastado: number;
+  disponible: number;
+  porcentajeUso: number;
+  fechaLimite: string;
 }
 
-const TOKEN_KEY = 'authToken';
-const USER_KEY = 'user';
-const RECOVERY_CODES_KEY = 'recoveryCodes';
-
-export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
-
-export const saveAuthToken = (token: string): void => {
-  localStorage.setItem(TOKEN_KEY, token);
-};
-
-export const saveUser = (user: StoredUserPayload): void => {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-};
-
-export const saveRecoveryCodes = (codes: string[]): void => {
-  localStorage.setItem(RECOVERY_CODES_KEY, JSON.stringify(codes));
-};
-
-export const getRecoveryCodes = (): string[] => {
-  const raw = localStorage.getItem(RECOVERY_CODES_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
-  } catch {
-    return [];
-  }
-};
-
-export interface StoredUserPayload {
-  id: string;
-  name: string;
-  email: string;
+export interface BackendRegistrationResponse {
+  usuario: BackendUser;
+  codigosRecuperacion: string[];
 }
 
-export const getStoredUser = (): StoredUserPayload | null => {
-  const userStr = localStorage.getItem(USER_KEY);
-  if (!userStr) return null;
-  try {
-    return JSON.parse(userStr) as StoredUserPayload;
-  } catch {
-    return null;
-  }
+// ===== HELPERS =====
+
+const getToken = (): string | null => {
+  return localStorage.getItem('authToken');
 };
 
-export const clearAuth = (): void => {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-};
-
-/** Decodifica el `sub` del JWT (solo para mostrar email tras login; no valida firma). */
-export const decodeJwtSubject = (token: string): string | null => {
-  try {
-    const payload = token.split('.')[1];
-    if (!payload) return null;
-    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as {
-      sub?: string;
-    };
-    return json.sub ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const mergeHeaders = (headers?: HeadersInit): HeadersInit => {
-  const merged: Record<string, string> = {
+const getAuthHeaders = (): HeadersInit => {
+  const token = getToken();
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  const token = getToken();
+
   if (token) {
-    merged['Authorization'] = `Bearer ${token}`;
+    headers['Authorization'] = `Bearer ${token}`;
   }
-  if (headers instanceof Headers) {
-    headers.forEach((v, k) => {
-      merged[k] = v;
-    });
-  } else if (Array.isArray(headers)) {
-    for (const [k, v] of headers) merged[k] = v;
-  } else if (headers && typeof headers === 'object') {
-    Object.assign(merged, headers);
-  }
-  return merged;
+
+  return headers;
 };
 
-function parseMaybeJsonMessage(text: string): string | null {
-  try {
-    const j = JSON.parse(text) as { message?: string; error?: string };
-    return j.message || j.error || null;
-  } catch {
-    return null;
-  }
-}
-
-async function handleJsonResponse<T>(response: Response, opts?: { allow401Navigate?: boolean }): Promise<T> {
-  const allow401Navigate = opts?.allow401Navigate ?? true;
-
+const handleResponse = async <T>(response: Response): Promise<T> => {
   if (response.status === 401 || response.status === 403) {
-    if (allow401Navigate) {
-      clearAuth();
-      window.location.href = '/login';
-    }
-    const text = await response.text();
-    const msg = parseMaybeJsonMessage(text) || text?.trim();
-    // Log for easier debugging in production
-    // eslint-disable-next-line no-console
-    console.error('API auth error', { url: response.url, status: response.status, body: text });
-    throw new Error(msg || 'Sesión expirada o acceso denegado');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+    throw new Error('Sesión expirada');
   }
 
   if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || `Error ${response.status}`);
+  }
+
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('text/plain')) {
     const text = await response.text();
-    const msg = parseMaybeJsonMessage(text) || text?.trim();
-    // Log non-ok responses to help diagnose 404/500 from backend
-    // eslint-disable-next-line no-console
-    console.error('API request failed', { url: response.url, status: response.status, body: text });
-    throw new Error(msg || `Error ${response.status}`);
+    return text as T;
   }
 
   if (response.status === 204) {
     return null as T;
   }
 
-  const contentType = response.headers.get('content-type');
-  if (contentType?.includes('text/plain')) {
-    const text = (await response.text()).trim().replace(/^"(.*)"$/, '$1');
-    return text as T;
-  }
-
-  return response.json() as Promise<T>;
-}
-
-async function fetchAuthorized(path: string, init?: RequestInit): Promise<Response> {
-  const fullUrl = `${BASE_URL}${path}`;
-  try {
-    const hasAuth = Boolean(getToken());
-    // eslint-disable-next-line no-console
-    console.debug('API fetch', { url: fullUrl, method: init?.method ?? 'GET', hasAuth });
-    return await fetch(fullUrl, {
-      ...init,
-      headers: mergeHeaders(init?.headers),
-    });
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('API fetch error', { url: fullUrl, error: err });
-    throw err;
-  }
-}
-
-// ——— Usuarios ———
-
-export const registerUsuario = async (
-  nombre: string,
-  correo: string,
-  clave: string,
-): Promise<BackendRegistroResponse> => {
-  const response = await fetch(`${BASE_URL}/usuarios/registro`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre, correo, clave }),
-  });
-  const data = await handleJsonResponse<BackendRegistroResponse>(response, {
-    allow401Navigate: false,
-  });
-  return data;
+  return response.json();
 };
 
-export const loginUsuario = async (correo: string, clave: string): Promise<string> => {
+// ===== USUARIOS =====
+
+export const registerUser = async (
+  nombre: string,
+  correo: string,
+  clave: string
+): Promise<BackendRegistrationResponse> => {
+  const response = await fetch(`${BASE_URL}/usuarios/registro`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ nombre, correo, clave }),
+  });
+
+  return handleResponse<BackendRegistrationResponse>(response);
+};
+
+export const loginUser = async (
+  correo: string,
+  clave: string
+): Promise<string> => {
   const response = await fetch(`${BASE_URL}/usuarios/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ correo, clave }),
   });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(parseMaybeJsonMessage(text) || text?.trim() || `Error ${response.status}`);
-  }
-
-  let tokenRaw: unknown;
-  const ct = response.headers.get('content-type');
-  if (ct?.includes('application/json')) {
-    tokenRaw = await response.json();
-  } else {
-    tokenRaw = (await response.text()).trim().replace(/^"|"$/g, '');
-  }
-
-  const token =
-    typeof tokenRaw === 'string'
-      ? tokenRaw.replace(/^"|"$/g, '')
-      : tokenRaw !== null && tokenRaw !== undefined
-        ? String(tokenRaw)
-        : '';
-
-  if (!token) throw new Error('No se recibió token');
-
-  return token;
+  return handleResponse<string>(response);
 };
 
-export const logoutUsuarioRemoto = async (): Promise<void> => {
-  const token = getToken();
-  if (!token) return;
-  try {
-    await fetch(`${BASE_URL}/usuarios/logout`, {
-      method: 'POST',
-      headers: mergeHeaders(),
-    });
-  } catch {
-    /* ignore network errors on logout */
-  }
+export const logoutUser = async (): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/usuarios/logout`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  await handleResponse<void>(response);
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('user');
 };
 
-export const recuperarPasswordUsuario = async (
+export const changePassword = async (
+  claveAntigua: string,
+  claveNueva: string
+): Promise<string> => {
+  const response = await fetch(`${BASE_URL}/usuarios/actualizarClave`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ claveAntigua, claveNueva }),
+  });
+
+  return handleResponse<string>(response);
+};
+
+export const recoverPassword = async (
   correo: string,
-  codigo: string,
+  codigo: string
 ): Promise<string> => {
   const response = await fetch(`${BASE_URL}/usuarios/recover`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ correo, codigo }),
   });
-  return handleJsonResponse<string>(response, { allow401Navigate: false });
+
+  return handleResponse<string>(response);
 };
 
-export const resetPasswordConTokenTemporal = async (
+export const resetPassword = async (
   tokenTemporal: string,
-  nuevaClave: string,
+  nuevaClave: string
 ): Promise<string> => {
   const response = await fetch(`${BASE_URL}/usuarios/reset-password`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ tokenTemporal, nuevaClave }),
   });
-  return handleJsonResponse<string>(response, { allow401Navigate: false });
+
+  return handleResponse<string>(response);
 };
 
-export const actualizarClaveUsuario = async (claveAntigua: string, claveNueva: string): Promise<string> => {
-  const response = await fetchAuthorized('/usuarios/actualizarClave', {
-    method: 'PUT',
-    body: JSON.stringify({ claveAntigua, claveNueva }),
-  });
-  return handleJsonResponse<string>(response, { allow401Navigate: false });
-};
+// ===== CATEGORÍAS =====
 
-// ——— Categorías ———
-
-export const crearCategoria = async (
+export const createCategory = async (
   nombre: string,
-  descripcion: string,
-): Promise<BackendCategoria> => {
-  const response = await fetchAuthorized('/categorias/crearCategoriaPropia', {
+  descripcion: string
+): Promise<BackendCategory> => {
+  const response = await fetch(`${BASE_URL}/categorias/crearCategoriaPropia`, {
     method: 'POST',
+    headers: getAuthHeaders(),
     body: JSON.stringify({ nombre, descripcion }),
   });
-  return handleJsonResponse<BackendCategoria>(response);
+
+  return handleResponse<BackendCategory>(response);
 };
 
-export const listarCategoriasUsuario = async (): Promise<BackendCategoria[]> => {
-  const response = await fetchAuthorized('/categorias/usuario');
-  return handleJsonResponse<BackendCategoria[]>(response);
-};
-
-export const actualizarCategoriaPropia = async (
+export const updateCategory = async (
   idCategoria: number,
   nombre: string,
-  descripcion: string,
-): Promise<BackendCategoria> => {
-  const response = await fetchAuthorized(`/categorias/actualizarCategoriaPropia/${idCategoria}`, {
+  descripcion: string
+): Promise<BackendCategory> => {
+  const response = await fetch(`${BASE_URL}/categorias/actualizarCategoriaPropia/${idCategoria}`, {
     method: 'PUT',
+    headers: getAuthHeaders(),
     body: JSON.stringify({ nombre, descripcion }),
   });
-  return handleJsonResponse<BackendCategoria>(response);
+
+  return handleResponse<BackendCategory>(response);
 };
 
-export const eliminarCategoriaPropia = async (idCategoria: number): Promise<void> => {
-  const response = await fetchAuthorized(`/categorias/eliminarCategoriaPropia/${idCategoria}`, {
+export const deleteCategory = async (idCategoria: number): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/categorias/eliminarCategoriaPropia/${idCategoria}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
-  await handleJsonResponse<null>(response);
+
+  return handleResponse<void>(response);
 };
 
-// ——— Transacciones ———
+export const getUserCategories = async (): Promise<BackendCategory[]> => {
+  const response = await fetch(`${BASE_URL}/categorias/usuario`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
 
-export const crearTransaccion = async (params: {
-  idCategoria?: number | null;
-  tipo: TipoTransaccionApi;
-  monto: number;
-  descripcion?: string;
-}): Promise<BackendTransaccion> => {
-  const body: Record<string, unknown> = {
-    tipo: params.tipo,
-    monto: String(params.monto),
-  };
-  if (params.descripcion !== undefined && params.descripcion !== '') {
-    body.descripcion = params.descripcion;
-  }
-  if (params.idCategoria != null && !Number.isNaN(params.idCategoria)) {
-    body.idCategoria = params.idCategoria;
-  }
+  return handleResponse<BackendCategory[]>(response);
+};
 
-  const response = await fetchAuthorized('/transacciones', {
+// ===== TRANSACCIONES =====
+
+export const createTransaction = async (
+  idCategoria: number,
+  tipo: 'INGRESO' | 'EGRESO',
+  monto: string,
+  descripcion?: string
+): Promise<{ transaccion: BackendTransaction; alertasGeneradas: any[] }> => {
+  const response = await fetch(`${BASE_URL}/transacciones`, {
     method: 'POST',
-    body: JSON.stringify(body),
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      idCategoria,
+      tipo,
+      monto,
+      descripcion
+    }),
   });
-  return handleJsonResponse<BackendTransaccion>(response);
+
+  return handleResponse<{ transaccion: BackendTransaction; alertasGeneradas: any[] }>(response);
 };
 
-export const listarTransaccionesUsuario = async (): Promise<BackendTransaccion[]> => {
-  const response = await fetchAuthorized('/transacciones/usuario');
-  return handleJsonResponse<BackendTransaccion[]>(response);
-};
-
-export const eliminarTransaccion = async (idTransaccion: number): Promise<void> => {
-  const response = await fetchAuthorized(`/transacciones/${idTransaccion}/usuario`, {
-    method: 'DELETE',
+export const getUserTransactions = async (): Promise<BackendTransaction[]> => {
+  const response = await fetch(`${BASE_URL}/transacciones/usuario`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
   });
-  await handleJsonResponse<null>(response);
+
+  return handleResponse<BackendTransaction[]>(response);
 };
 
-// ——— Transacciones programadas ———
-
-export const crearTransaccionProgramada = async (body: {
-  monto: string;
-  descripcion?: string;
-  fechaInicio: string;
-  fechaFin: string | null;
-  frecuencia: FrecuenciaTransaccionApi;
-  tipo: TipoTransaccionApi;
-  idCategoria: number;
-}): Promise<BackendTransaccionProgramada> => {
-  const payload = {
-    ...body,
-    fechaFin: body.fechaFin,
-  };
-  const response = await fetchAuthorized('/transacciones-programadas/usuario', {
-    method: 'POST',
-    body: JSON.stringify(payload),
+export const getIncomeTransactions = async (): Promise<BackendTransaction[]> => {
+  const response = await fetch(`${BASE_URL}/transacciones/usuario/ingresos`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
   });
-  return handleJsonResponse<BackendTransaccionProgramada>(response);
+
+  return handleResponse<BackendTransaction[]>(response);
 };
 
-export const actualizarTransaccionProgramada = async (
-  id: number,
-  patch: Partial<{
-    monto: string;
-    descripcion: string;
-    fechaInicio: string;
-    fechaFin: string | null;
-    frecuencia: FrecuenciaTransaccionApi;
-  }>,
-): Promise<BackendTransaccionProgramada> => {
-  const response = await fetchAuthorized(`/transacciones-programadas/usuario/${id}`, {
+export const getExpenseTransactions = async (): Promise<BackendTransaction[]> => {
+  const response = await fetch(`${BASE_URL}/transacciones/usuario/gastos`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<BackendTransaction[]>(response);
+};
+
+export const updateTransaction = async (
+  idTransaccion: number,
+  idCategoria: number,
+  tipo: 'INGRESO' | 'EGRESO',
+  monto: string,
+  descripcion?: string
+): Promise<BackendTransaction> => {
+  const response = await fetch(`${BASE_URL}/transacciones/${idTransaccion}/usuario`, {
     method: 'PUT',
-    body: JSON.stringify(patch),
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      idCategoria,
+      tipo,
+      monto,
+      descripcion
+    }),
   });
-  return handleJsonResponse<BackendTransaccionProgramada>(response);
+
+  return handleResponse<BackendTransaction>(response);
 };
 
-export const eliminarTransaccionProgramada = async (id: number): Promise<void> => {
-  const response = await fetchAuthorized(`/transacciones-programadas/usuario/${id}`, {
+export const deleteTransaction = async (idTransaccion: number): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/transacciones/${idTransaccion}/usuario`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
-  await handleJsonResponse<null>(response);
+
+  return handleResponse<void>(response);
 };
 
-export const listarIngresosProgramadosApi = (): Promise<BackendTransaccionProgramada[]> =>
-  fetchAuthorized('/transacciones-programadas/usuario/ingresosProgramados').then((r) =>
-    handleJsonResponse<BackendTransaccionProgramada[]>(r),
-  );
+// ===== TRANSACCIONES PROGRAMADAS =====
 
-export const listarEgresosProgramadosApi = (): Promise<BackendTransaccionProgramada[]> =>
-  fetchAuthorized('/transacciones-programadas/usuario/egresosProgramados').then((r) =>
-    handleJsonResponse<BackendTransaccionProgramada[]>(r),
-  );
-
-// ——— Presupuestos ———
-
-export const crearPresupuestoGlobalApi = async (montoLimite: number): Promise<unknown> => {
-  const response = await fetchAuthorized('/presupuestos/global', {
+export const createScheduledTransaction = async (
+  monto: string,
+  descripcion: string,
+  fechaInicio: string,
+  fechaFin: string,
+  frecuencia: 'DIARIA' | 'SEMANAL' | 'MENSUAL' | 'ANUAL',
+  tipo: 'INGRESO' | 'EGRESO',
+  idCategoria: number
+): Promise<BackendScheduledTransaction> => {
+  const response = await fetch(`${BASE_URL}/transacciones-programadas/usuario`, {
     method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      monto,
+      descripcion,
+      fechaInicio,
+      fechaFin,
+      frecuencia,
+      tipo,
+      idCategoria
+    }),
+  });
+
+  return handleResponse<BackendScheduledTransaction>(response);
+};
+
+export const updateScheduledTransaction = async (
+  id: number,
+  monto: string,
+  descripcion: string,
+  fechaInicio: string,
+  fechaFin: string,
+  frecuencia: 'DIARIA' | 'SEMANAL' | 'MENSUAL' | 'ANUAL',
+  estado: 'ACTIVO' | 'INACTIVO'
+): Promise<BackendScheduledTransaction> => {
+  const response = await fetch(`${BASE_URL}/transacciones-programadas/usuario/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      monto,
+      descripcion,
+      fechaInicio,
+      fechaFin,
+      frecuencia,
+      estado
+    }),
+  });
+
+  return handleResponse<BackendScheduledTransaction>(response);
+};
+
+export const deleteScheduledTransaction = async (id: number): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/transacciones-programadas/usuario/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<void>(response);
+};
+
+export const getScheduledIncomes = async (): Promise<BackendScheduledTransaction[]> => {
+  const response = await fetch(`${BASE_URL}/transacciones-programadas/usuario/ingresosProgramados`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<BackendScheduledTransaction[]>(response);
+};
+
+export const getScheduledExpenses = async (): Promise<BackendScheduledTransaction[]> => {
+  const response = await fetch(`${BASE_URL}/transacciones-programadas/usuario/egresosProgramados`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<BackendScheduledTransaction[]>(response);
+};
+
+// ===== PRESUPUESTOS =====
+
+export const createOrUpdateGlobalBudget = async (
+  montoLimite: number
+): Promise<BackendBudget> => {
+  const response = await fetch(`${BASE_URL}/presupuestos/global`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
     body: JSON.stringify({ montoLimite }),
   });
-  return handleJsonResponse(response);
+
+  return handleResponse<BackendBudget>(response);
 };
 
-export const crearPresupuestoCategoriaApi = async (
+export const createOrUpdateCategoryBudget = async (
   idCategoria: number,
-  montoLimite: number,
-): Promise<unknown> => {
-  const response = await fetchAuthorized('/presupuestos/categoria', {
+  montoLimite: number
+): Promise<BackendBudget> => {
+  const response = await fetch(`${BASE_URL}/presupuestos/categoria`, {
     method: 'POST',
+    headers: getAuthHeaders(),
     body: JSON.stringify({ idCategoria, montoLimite }),
   });
-  return handleJsonResponse(response);
+
+  return handleResponse<BackendBudget>(response);
 };
 
-export const obtenerResumenPresupuestoGlobal = async (): Promise<ResumenPresupuestoGlobal> => {
-  const response = await fetchAuthorized('/presupuestos/global/usuario');
-  return handleJsonResponse<ResumenPresupuestoGlobal>(response);
+export const getGlobalBudgetSummary = async (): Promise<BackendBudgetSummary> => {
+  const response = await fetch(`${BASE_URL}/presupuestos/global/usuario`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<BackendBudgetSummary>(response);
 };
 
-export const obtenerResumenPresupuestosCategoria = async (): Promise<ResumenPresupuestoCategoria[]> => {
-  const response = await fetchAuthorized('/presupuestos/categorias/usuario');
-  return handleJsonResponse<ResumenPresupuestoCategoria[]>(response);
+export const getCategoryBudgetsSummary = async (): Promise<BackendCategoryBudgetSummary[]> => {
+  const response = await fetch(`${BASE_URL}/presupuestos/categorias/usuario`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<BackendCategoryBudgetSummary[]>(response);
 };
 
-function buildMonthQuery(month?: number, year?: number): string {
+// ===== REPORTES =====
+
+export const getExpensesByCategory = async (month?: number, year?: number) => {
   const params = new URLSearchParams();
-  if (typeof month === 'number' && month > 0) {
-    params.set('month', String(month));
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
+
+  const response = await fetch(`${BASE_URL}/reports/expenses?${params.toString()}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<Array<{
+    idCategoria: number;
+    nombreCategoria: string;
+    totalGastado: number;
+    cantidadTransacciones: number;
+  }>>(response);
+};
+
+export const getIncomeByCategory = async (month?: number, year?: number) => {
+  const params = new URLSearchParams();
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
+
+  const response = await fetch(`${BASE_URL}/reports/income?${params.toString()}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<Array<{
+    idCategoria: number;
+    nombreCategoria: string;
+    totalIngresado: number;
+    cantidadTransacciones: number;
+  }>>(response);
+};
+
+export const getMonthlySummary = async (month?: number, year?: number) => {
+  const params = new URLSearchParams();
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
+
+  const response = await fetch(`${BASE_URL}/reports/summary?${params.toString()}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<{
+    totalIngresos: number;
+    totalEgresos: number;
+    balance: number;
+    porcentajeAhorro: number;
+    mes: number;
+    anio: number;
+  }>(response);
+};
+
+export const getMonthlyComparison = async (month?: number, year?: number) => {
+  const params = new URLSearchParams();
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
+
+  const response = await fetch(`${BASE_URL}/reports/monthly-comparison?${params.toString()}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<{
+    nombreUsuario: string;
+    mes: number;
+    anio: number;
+    totalIngresos: number;
+    totalGastos: number;
+    balance: number;
+    estadoBalance: string;
+    montoDeficit: number;
+    porcentajeAhorro: number;
+    datosGrafico: {
+      ingresos: number;
+      gastos: number;
+    };
+    movimientosResumen: Array<{
+      fecha: string;
+      tipo: string;
+      categoria: string;
+      monto: number;
+      descripcion: string;
+    }>;
+  }>(response);
+};
+
+// ===== ALERTAS =====
+
+export const getUserAlerts = async () => {
+  const response = await fetch(`${BASE_URL}/alertas/usuario`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<Array<{
+    id: number;
+    presupuestoId: number;
+    tipo: string;
+    mensaje: string;
+    fecha: string;
+  }>>(response);
+};
+
+// ===== RECOMENDACIONES =====
+
+export const getBalanceRecommendations = async (): Promise<string> => {
+  const response = await fetch(`${BASE_URL}/recomendaciones/balance`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<string>(response);
+};
+
+export const getAlertRecommendations = async (): Promise<string> => {
+  const response = await fetch(`${BASE_URL}/recomendaciones/alertas`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<string>(response);
+};
+
+// ===== HELPERS DE ALMACENAMIENTO =====
+
+export const saveAuthToken = (token: string): void => {
+  localStorage.setItem('authToken', token);
+};
+
+export const saveUser = (user: BackendUser): void => {
+  localStorage.setItem('user', JSON.stringify(user));
+};
+
+export const getStoredUser = (): BackendUser | null => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return null;
+  try {
+    return JSON.parse(userStr);
+  } catch {
+    return null;
   }
-  if (typeof year === 'number' && year > 0) {
-    params.set('year', String(year));
-  }
-  const query = params.toString();
-  return query ? `?${query}` : '';
-}
-
-export const obtenerReporteGastosPorCategoria = async (
-  month?: number,
-  year?: number,
-): Promise<ReporteGastosCategoriaApi[]> => {
-  const response = await fetchAuthorized(`/reports/expenses${buildMonthQuery(month, year)}`);
-  return handleJsonResponse<ReporteGastosCategoriaApi[]>(response);
 };
 
-export const obtenerReporteIngresosPorCategoria = async (
-  month?: number,
-  year?: number,
-): Promise<ReporteIngresosCategoriaApi[]> => {
-  const response = await fetchAuthorized(`/reports/income${buildMonthQuery(month, year)}`);
-  return handleJsonResponse<ReporteIngresosCategoriaApi[]>(response);
-};
-
-export const obtenerResumenMensual = async (
-  month?: number,
-  year?: number,
-): Promise<ResumenMensualApi> => {
-  const response = await fetchAuthorized(`/reports/summary${buildMonthQuery(month, year)}`);
-  return handleJsonResponse<ResumenMensualApi>(response);
-};
-
-export const obtenerComparativoMensual = async (
-  month?: number,
-  year?: number,
-): Promise<ComparativoMensualApi> => {
-  const response = await fetchAuthorized(
-    `/reports/monthly-comparison${buildMonthQuery(month, year)}`,
-  );
-  return handleJsonResponse<ComparativoMensualApi>(response);
-};
-
-export const obtenerRecomendacionBalance = async (): Promise<string> => {
-  const response = await fetchAuthorized('/recomendaciones/balance');
-  return handleJsonResponse<string>(response);
-};
-
-export const obtenerRecomendacionAlertas = async (): Promise<string> => {
-  const response = await fetchAuthorized('/recomendaciones/alertas');
-  return handleJsonResponse<string>(response);
+export const clearAuth = (): void => {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('user');
 };

@@ -1,8 +1,10 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter } from "react-router";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { RecoveryCodesPage } from "./pages/RecoveryCodesPage";
+import { RecoveryCodeLoginPage } from "./pages/RecoveryCodeLoginPage";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { BudgetsPage } from "./pages/BudgetsPage";
@@ -30,6 +32,14 @@ export const router = createBrowserRouter([
   {
     path: "/reset-password",
     Component: ResetPasswordPage,
+  },
+  {
+    path: "/recovery-codes",
+    Component: RecoveryCodesPage,
+  },
+  {
+    path: "/recovery-code-login",
+    Component: RecoveryCodeLoginPage,
   },
   {
     path: "/",
