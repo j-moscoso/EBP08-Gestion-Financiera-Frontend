@@ -86,14 +86,7 @@ const getAuthHeaders = (): HeadersInit => {
   };
 
   if (token) {
-    const cleanToken = token.trim();
-    headers['Authorization'] = `Bearer ${cleanToken}`;
-    console.log('📤 Headers con Authorization:', {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${cleanToken.substring(0, 20)}...`
-    });
-  } else {
-    console.warn('⚠️ getAuthHeaders llamado sin token en localStorage');
+    headers['Authorization'] = `Bearer ${token.trim()}`;
   }
 
   return headers;
@@ -154,7 +147,6 @@ export const loginUser = async (
   correo: string,
   clave: string
 ): Promise<string> => {
-  console.log('🔐 Intentando login para:', correo);
   const response = await fetch(`${BASE_URL}/usuarios/login`, {
     method: 'POST',
     headers: {
@@ -163,9 +155,7 @@ export const loginUser = async (
     body: JSON.stringify({ correo, clave }),
   });
 
-  const token = await handleResponse<string>(response);
-  console.log('🎫 Token recibido del backend:', typeof token, token.substring(0, 30) + '...');
-  return token;
+  return handleResponse<string>(response);
 };
 
 export const logoutUser = async (): Promise<void> => {
@@ -228,13 +218,9 @@ export const createCategory = async (
   nombre: string,
   descripcion: string
 ): Promise<BackendCategory> => {
-  console.log('📝 Creando categoría:', nombre);
-  const headers = getAuthHeaders();
-  console.log('📋 Headers para crear categoría:', headers);
-
   const response = await fetch(`${BASE_URL}/categorias/crearCategoriaPropia`, {
     method: 'POST',
-    headers: headers,
+    headers: getAuthHeaders(),
     body: JSON.stringify({ nombre, descripcion }),
   });
 
@@ -265,13 +251,9 @@ export const deleteCategory = async (idCategoria: number): Promise<void> => {
 };
 
 export const getUserCategories = async (): Promise<BackendCategory[]> => {
-  console.log('📂 Obteniendo categorías del usuario');
-  const headers = getAuthHeaders();
-  console.log('📋 Headers para obtener categorías:', headers);
-
   const response = await fetch(`${BASE_URL}/categorias/usuario`, {
     method: 'GET',
-    headers: headers,
+    headers: getAuthHeaders(),
   });
 
   return handleResponse<BackendCategory[]>(response);
@@ -285,13 +267,9 @@ export const createTransaction = async (
   monto: string,
   descripcion?: string
 ): Promise<{ transaccion: BackendTransaction; alertasGeneradas: any[] }> => {
-  console.log('💰 Creando transacción:', { tipo, monto, descripcion });
-  const headers = getAuthHeaders();
-  console.log('📋 Headers para crear transacción:', headers);
-
   const response = await fetch(`${BASE_URL}/transacciones`, {
     method: 'POST',
-    headers: headers,
+    headers: getAuthHeaders(),
     body: JSON.stringify({
       idCategoria,
       tipo,
@@ -617,20 +595,11 @@ export const getAlertRecommendations = async (): Promise<string> => {
 // ===== HELPERS DE ALMACENAMIENTO =====
 
 export const saveAuthToken = (token: string): void => {
-  // Limpiar espacios en blanco y saltos de línea del token
-  const cleanToken = token.trim();
-  console.log('🔑 Guardando token JWT:', cleanToken.substring(0, 20) + '...');
-  localStorage.setItem('authToken', cleanToken);
+  localStorage.setItem('authToken', token.trim());
 };
 
 export const getToken = (): string | null => {
-  const token = localStorage.getItem('authToken');
-  if (token) {
-    console.log('🔑 Token encontrado en localStorage:', token.substring(0, 20) + '...');
-  } else {
-    console.log('❌ No hay token en localStorage');
-  }
-  return token;
+  return localStorage.getItem('authToken');
 };
 
 export const saveUser = (user: BackendUser): void => {
