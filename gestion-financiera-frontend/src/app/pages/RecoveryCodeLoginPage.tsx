@@ -39,9 +39,10 @@ export function RecoveryCodeLoginPage() {
   const [passwordError, setPasswordError] = useState('');
 
   const handleCodeInput = (val: string) => {
-    const clean = val.replace(/-/g, '').toUpperCase().slice(0, 12);
-    const parts = [clean.slice(0, 4), clean.slice(4, 8), clean.slice(8, 12)].filter(Boolean);
-    setCode(parts.join('-'));
+    // Limpiar espacios al inicio y final, convertir a mayúsculas
+    // Mantener intactos los guiones, letras y números
+    const cleaned = val.trim().toUpperCase();
+    setCode(cleaned);
     setCodeError('');
   };
 
@@ -69,7 +70,15 @@ export function RecoveryCodeLoginPage() {
 
     try {
       // Llamar a la API de recuperación
-      const token = await api.recoverPassword(email, code.replace(/-/g, ''));
+      // Enviar el código exactamente como fue ingresado (con guiones)
+      const finalCode = code.trim();
+      console.log('[RecoveryCode] Código ingresado:', code);
+      console.log('[RecoveryCode] Código a enviar:', finalCode);
+      console.log('[RecoveryCode] Email:', email);
+
+      const token = await api.recoverPassword(email, finalCode);
+      console.log('[RecoveryCode] Token recibido exitosamente');
+
       setTemporalToken(token);
       setStage('new-password');
       toast.success('Código verificado correctamente');
@@ -183,7 +192,7 @@ export function RecoveryCodeLoginPage() {
                   <p className="text-destructive text-sm mt-2">{codeError}</p>
                 )}
                 <p className="text-muted-foreground text-xs mt-2">
-                  Usa uno de los 10 códigos que recibiste al registrarte
+                  Copia y pega exactamente uno de los 10 códigos que recibiste al registrarte (formato: Y4X5-SH8M-CRGN)
                 </p>
               </div>
 

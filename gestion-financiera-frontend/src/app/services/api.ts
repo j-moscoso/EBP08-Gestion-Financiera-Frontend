@@ -216,14 +216,18 @@ export const recoverPassword = async (
   correo: string,
   codigo: string
 ): Promise<string> => {
+  const payload = { correo, codigo };
+  console.log('[API] recoverPassword payload:', JSON.stringify(payload, null, 2));
+
   const response = await fetch(`${BASE_URL}/usuarios/recover`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ correo, codigo }),
+    body: JSON.stringify(payload),
   });
 
+  console.log('[API] recoverPassword response status:', response.status);
   return handleResponse<string>(response);
 };
 
