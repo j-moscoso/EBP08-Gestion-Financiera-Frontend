@@ -2,48 +2,35 @@ import { useState, useEffect } from 'react';
 import { Plus, Target, AlertCircle, Calendar, TrendingDown, CheckCircle2, Bell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
-import { getUserAlerts, getAllCategories } from '../services/api';
+import { getUserCategories } from '../services/api';
 import { mapBackendCategory } from '../services/mappers';
 import type { Category } from '../types';
 
-interface Alert {
-  id: number;
-  presupuestoId: number;
-  tipo: string;
-  mensaje: string;
-  fecha: string;
-}
-
 export function BudgetsPage() {
-  const { budgets, addBudget, transactions } = useApp();
+  const { budgets, addBudget, transactions, alerts } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [budgetType, setBudgetType] = useState<'global' | 'category'>('global');
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
 
-  // Cargar alertas y categorías al montar el componente
+  // Cargar TODAS las categorías (globales + propias) al montar
   useEffect(() => {
-    const loadData = async () => {
+    const loadCategories = async () => {
       try {
-        // Cargar alertas
-        const userAlerts = await getUserAlerts();
-        setAlerts(userAlerts);
-
-        // Cargar TODAS las categorías (propias + globales) para AJUSTE 2
-        const backendCategories = await getAllCategories();
+        // GET /api/categorias/usuario devuelve TODAS las categorías visibles (globales + propias)
+        const backendCategories = await getUserCategories();
         const mappedCategories = backendCategories.map(mapBackendCategory);
+        console.log('[BudgetsPage] Categorías cargadas:', mappedCategories.length);
         setAllCategories(mappedCategories);
       } catch (error: any) {
-        console.error('[BudgetsPage] Error al cargar datos:', error);
-        // No mostrar toast de error, es opcional
+        console.error('[BudgetsPage] Error al cargar categorías:', error);
       }
     };
 
-    loadData();
+    loadCategories();
   }, [selectedMonth]);
 
   const handleSubmit = (e: React.FormEvent) => {

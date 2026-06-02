@@ -1,45 +1,23 @@
-import { useState, useEffect } from 'react';
-import { Bell, X, AlertCircle } from 'lucide-react';
-import { getUserAlerts } from '../services/api';
-
-interface Alert {
-  id: number;
-  presupuestoId: number;
-  tipo: string;
-  mensaje: string;
-  fecha: string;
-}
+import { useState } from 'react';
+import { Bell, X } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 export function AlertsBanner() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const { alerts } = useApp();
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    loadAlerts();
-  }, []);
-
-  const loadAlerts = async () => {
-    try {
-      const allAlerts = await getUserAlerts();
-
-      // Filtrar alertas del mes actual
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const currentMonthAlerts = allAlerts.filter(alert => {
-        const alertMonth = alert.fecha.slice(0, 7);
-        return alertMonth === currentMonth;
-      });
-
-      setAlerts(currentMonthAlerts);
-    } catch (error) {
-      console.error('[AlertsBanner] Error al cargar alertas:', error);
-    }
-  };
+  // Filtrar alertas del mes actual
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonthAlerts = alerts.filter(alert => {
+    const alertMonth = alert.fecha.slice(0, 7);
+    return alertMonth === currentMonth;
+  });
 
   const handleDismiss = (alertId: number) => {
     setDismissedAlerts(prev => new Set(prev).add(alertId));
   };
 
-  const visibleAlerts = alerts.filter(alert => !dismissedAlerts.has(alert.id));
+  const visibleAlerts = currentMonthAlerts.filter(alert => !dismissedAlerts.has(alert.id));
 
   if (visibleAlerts.length === 0) {
     return null;

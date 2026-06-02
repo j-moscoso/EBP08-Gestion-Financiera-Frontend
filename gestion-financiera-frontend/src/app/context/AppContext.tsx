@@ -13,6 +13,14 @@ import {
 } from '../services/mappers';
 import { toast } from 'sonner';
 
+export interface Alert {
+  id: number;
+  presupuestoId: number;
+  tipo: string;
+  mensaje: string;
+  fecha: string;
+}
+
 interface AppContextType {
   user: User | null;
   setUser: (user: User | null) => void;
@@ -35,6 +43,8 @@ interface AppContextType {
   budgets: Budget[];
   addBudget: (budget: Omit<Budget, 'id'>) => Promise<void>;
   updateBudget: (id: string, budget: Partial<Budget>) => Promise<void>;
+  alerts: Alert[];
+  loadAlerts: () => Promise<void>;
   loading: boolean;
 }
 
@@ -46,6 +56,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [scheduledTransactions, setScheduledTransactions] = useState<ScheduledTransaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Función para iniciar sesión
@@ -101,6 +112,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTransactions([]);
       setScheduledTransactions([]);
       setBudgets([]);
+      setAlerts([]);
+    }
+  };
+
+  // Función para cargar alertas
+  const loadAlerts = async (): Promise<void> => {
+    try {
+      const userAlerts = await api.getUserAlerts();
+      setAlerts(userAlerts);
+    } catch (error: any) {
+      console.error('[loadAlerts] Error al cargar alertas:', error);
+      // No mostrar toast de error para alertas, es opcional
     }
   };
 
@@ -164,6 +187,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
       setBudgets(mappedBudgets);
+
+      // Cargar alertas
+      await loadAlerts();
     } catch (error: any) {
       console.error('Error al cargar datos del usuario:', error);
       toast.error(error.message || 'Error al cargar los datos');
@@ -229,6 +255,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           );
         });
       }
+
+      // Recargar alertas para actualizar el banner (PROBLEMA 2)
+      await loadAlerts();
     } catch (error: any) {
       toast.error(error.message || 'Error al crear la transacción');
       throw error;
@@ -422,6 +451,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Recargar presupuestos
       await loadBudgets();
+
+      // Recargar alertas (PROBLEMA 2)
+      await loadAlerts();
+
       toast.success('Presupuesto creado');
     } catch (error: any) {
       toast.error(error.message || 'Error al crear el presupuesto');
@@ -444,6 +477,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       await loadBudgets();
+
+      // Recargar alertas (PROBLEMA 2)
+      await loadAlerts();
+
       toast.success('Presupuesto actualizado');
     } catch (error: any) {
       toast.error(error.message || 'Error al actualizar el presupuesto');
@@ -514,6 +551,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         budgets,
         addBudget,
         updateBudget,
+        alerts,
+        loadAlerts,
         loading,
       }}
     >
