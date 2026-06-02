@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+// AppContext - Gestión global del estado de la aplicación
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import type { Transaction, Category, Budget, User, ScheduledTransaction } from '../types';
 import * as api from '../services/api';
 import {
@@ -48,12 +49,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Debug: Verificar que el provider se monta
+  useEffect(() => {
+    console.log('✅ AppProvider montado correctamente');
+  }, []);
+
   // Cargar usuario desde localStorage al iniciar
   useEffect(() => {
+    const token = api.getToken();
     const storedUser = api.getStoredUser();
-    if (storedUser) {
+
+    if (token && storedUser) {
+      // Si hay token y usuario guardado, restaurar sesión
       setUser(mapBackendUser(storedUser));
-      loadUserData();
+    } else if (token) {
+      // Si solo hay token, crear usuario temporal
+      // Los datos se cargarán cuando entre al dashboard
+      setUser({
+        id: 'pending',
+        name: 'Usuario',
+        email: ''
+      });
     }
   }, []);
 
@@ -61,29 +77,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loginWithCredentials = async (email: string, password: string): Promise<User> => {
     setLoading(true);
     try {
-      // Obtener token
+      // Obtener token del backend
       const token = await api.loginUser(email, password);
       api.saveAuthToken(token);
 
-      // Cargar categorías para obtener información del usuario
-      const backendCategories = await api.getUserCategories();
+      // Crear usuario temporal solo con el email
+      // La información completa se obtendrá al cargar los datos en el dashboard
+      const temporalUser: User = {
+        id: 'pending', // Se actualizará al cargar los datos
+        name: email.split('@')[0], // Nombre temporal del email
+        email: email
+      };
 
-      // El usuario viene en las categorías, extraerlo de ahí
-      const backendUser = backendCategories.find(c => c.usuario)?.usuario;
+      // Guardar usuario temporal
+      setUser(temporalUser);
 
-      if (backendUser) {
-        api.saveUser(backendUser);
-        const mappedUser = mapBackendUser(backendUser);
-        setUser(mappedUser);
-
-        // Cargar datos del usuario
-        await loadUserData();
-
-        return mappedUser;
-      } else {
-        throw new Error('No se pudo obtener información del usuario');
-      }
+      return temporalUser;
     } catch (error) {
+      api.clearAuth();
       throw error;
     } finally {
       setLoading(false);
@@ -107,13 +118,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Función para cargar todos los datos del usuario
-  const loadUserData = async (): Promise<void> => {
+  const loadUserData = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
       // Cargar categorías
       const backendCategories = await api.getUserCategories();
       const mappedCategories = backendCategories.map(mapBackendCategory);
       setCategories(mappedCategories);
+
+      // Extraer y actualizar información del usuario desde las categorías
+      const backendUser = backendCategories.find(c => c.usuario)?.usuario;
+      if (backendUser) {
+        api.saveUser(backendUser);
+        const mappedUser = mapBackendUser(backendUser);
+        setUser(mappedUser);
+      }
 
       // Cargar transacciones
       const backendTransactions = await api.getUserTransactions();
@@ -161,7 +180,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Función para cambiar contraseña
   const changePassword = async (oldPassword: string, newPassword: string): Promise<void> => {
@@ -482,7 +501,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useApp() {
+export function useApp(): AppContextType {
   const context = useContext(AppContext);
   if (context === undefined) {
     throw new Error('useApp debe ser usado dentro de AppProvider');

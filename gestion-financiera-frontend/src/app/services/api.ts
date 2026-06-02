@@ -79,12 +79,8 @@ export interface BackendRegistrationResponse {
 
 // ===== HELPERS =====
 
-const getToken = (): string | null => {
-  return localStorage.getItem('authToken');
-};
-
 const getAuthHeaders = (): HeadersInit => {
-  const token = getToken();
+  const token = localStorage.getItem('authToken');
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
@@ -97,14 +93,21 @@ const getAuthHeaders = (): HeadersInit => {
 };
 
 const handleResponse = async <T>(response: Response): Promise<T> => {
-  if (response.status === 401 || response.status === 403) {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-    throw new Error('Sesión expirada');
-  }
-
   if (!response.ok) {
+    // Si es 401 o 403, limpiar autenticación
+    if (response.status === 401 || response.status === 403) {
+      const token = localStorage.getItem('authToken');
+      // Solo limpiar si hay token (sesión expirada), no en errores de login
+      if (token) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        // Redirigir solo si no estamos ya en login
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
+    }
+
     const error = await response.text();
     throw new Error(error || `Error ${response.status}`);
   }
@@ -593,6 +596,10 @@ export const getAlertRecommendations = async (): Promise<string> => {
 
 export const saveAuthToken = (token: string): void => {
   localStorage.setItem('authToken', token);
+};
+
+export const getToken = (): string | null => {
+  return localStorage.getItem('authToken');
 };
 
 export const saveUser = (user: BackendUser): void => {
