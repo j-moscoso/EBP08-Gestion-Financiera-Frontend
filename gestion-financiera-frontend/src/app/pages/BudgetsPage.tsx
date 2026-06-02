@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Plus, Target, AlertCircle, Calendar, TrendingDown, CheckCircle2, Bell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
-import { getUserAlerts } from '../services/api';
+import { getUserAlerts, getAllCategories } from '../services/api';
+import { mapBackendCategory } from '../services/mappers';
+import type { Category } from '../types';
 
 interface Alert {
   id: number;
@@ -13,7 +15,7 @@ interface Alert {
 }
 
 export function BudgetsPage() {
-  const { budgets, addBudget, categories, transactions } = useApp();
+  const { budgets, addBudget, transactions } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [budgetType, setBudgetType] = useState<'global' | 'category'>('global');
   const [name, setName] = useState('');
@@ -21,20 +23,27 @@ export function BudgetsPage() {
   const [categoryId, setCategoryId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
 
-  // Cargar alertas al montar el componente y cuando cambie el mes
+  // Cargar alertas y categorías al montar el componente
   useEffect(() => {
-    const loadAlerts = async () => {
+    const loadData = async () => {
       try {
+        // Cargar alertas
         const userAlerts = await getUserAlerts();
         setAlerts(userAlerts);
+
+        // Cargar TODAS las categorías (propias + globales) para AJUSTE 2
+        const backendCategories = await getAllCategories();
+        const mappedCategories = backendCategories.map(mapBackendCategory);
+        setAllCategories(mappedCategories);
       } catch (error: any) {
-        console.error('[BudgetsPage] Error al cargar alertas:', error);
-        // No mostrar toast de error para alertas, es opcional
+        console.error('[BudgetsPage] Error al cargar datos:', error);
+        // No mostrar toast de error, es opcional
       }
     };
 
-    loadAlerts();
+    loadData();
   }, [selectedMonth]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -97,7 +106,8 @@ export function BudgetsPage() {
   const globalBudget = filteredBudgets.find(b => !b.categoryId);
   const categoryBudgets = filteredBudgets.filter(b => b.categoryId);
 
-  const availableCategories = categories.filter(c => !c.isDefault);
+  // Usar TODAS las categorías (propias + globales) para AJUSTE 2
+  const availableCategories = allCategories.filter(c => !c.isDefault);
 
   // Calcular gastos por categoría del mes seleccionado
   const getCategorySpent = (categoryId: string) => {

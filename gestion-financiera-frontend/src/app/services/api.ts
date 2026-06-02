@@ -289,6 +289,15 @@ export const getUserCategories = async (): Promise<BackendCategory[]> => {
   return handleResponse<BackendCategory[]>(response);
 };
 
+export const getAllCategories = async (): Promise<BackendCategory[]> => {
+  const response = await fetch(`${BASE_URL}/categorias`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<BackendCategory[]>(response);
+};
+
 // ===== TRANSACCIONES =====
 
 export const createTransaction = async (

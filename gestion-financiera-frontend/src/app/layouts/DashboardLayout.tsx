@@ -3,6 +3,7 @@ import { LogOut, LayoutDashboard, Target, FolderOpen, Menu, X, TrendingUp, Trend
 import { useApp } from '../context/AppContext';
 import { useState, useEffect } from 'react';
 import { AppLogo } from '../components/AppLogo';
+import { AlertsBanner } from '../components/AlertsBanner';
 
 export function DashboardLayout() {
   const navigate = useNavigate();
@@ -135,6 +136,9 @@ export function DashboardLayout() {
           )}
         </div>
       </header>
+
+      {/* Alerts Banner */}
+      <AlertsBanner />
 
       {/* Main Content */}
       <main>

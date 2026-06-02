@@ -216,6 +216,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await loadBudgets();
 
       toast.success('Transacción creada');
+
+      // Mostrar alertas generadas (AJUSTE 3)
+      if (result.alertasGeneradas && result.alertasGeneradas.length > 0) {
+        result.alertasGeneradas.forEach((alerta: any) => {
+          toast.warning(
+            `⚠️ ${alerta.tipo}: ${alerta.mensaje}`,
+            {
+              duration: 8000,
+              className: 'text-base font-medium'
+            }
+          );
+        });
+      }
     } catch (error: any) {
       toast.error(error.message || 'Error al crear la transacción');
       throw error;
