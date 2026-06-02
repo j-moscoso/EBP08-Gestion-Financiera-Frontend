@@ -1,4 +1,7 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://eko-mj59.onrender.com/api';
+const viteEnv = import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } };
+const BASE_URL = viteEnv.env?.VITE_API_BASE_URL || 'https://eko-mj59.onrender.com/api';
+const AUTH_TOKEN_KEY = 'authToken';
+const USER_KEY = 'user';
 
 // ===== TIPOS DEL BACKEND =====
 
@@ -80,7 +83,7 @@ export interface BackendRegistrationResponse {
 // ===== HELPERS =====
 
 const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('authToken');
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
@@ -96,11 +99,11 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     // Si es 401 o 403, limpiar autenticación
     if (response.status === 401 || response.status === 403) {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
       // Solo limpiar si hay token (sesión expirada), no en errores de login
       if (token) {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
         // Redirigir solo si no estamos ya en login
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/login';
@@ -595,19 +598,19 @@ export const getAlertRecommendations = async (): Promise<string> => {
 // ===== HELPERS DE ALMACENAMIENTO =====
 
 export const saveAuthToken = (token: string): void => {
-  localStorage.setItem('authToken', token.trim());
+  localStorage.setItem(AUTH_TOKEN_KEY, token.trim());
 };
 
 export const getToken = (): string | null => {
-  return localStorage.getItem('authToken');
+  return localStorage.getItem(AUTH_TOKEN_KEY);
 };
 
 export const saveUser = (user: BackendUser): void => {
-  localStorage.setItem('user', JSON.stringify(user));
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
 export const getStoredUser = (): BackendUser | null => {
-  const userStr = localStorage.getItem('user');
+  const userStr = localStorage.getItem(USER_KEY);
   if (!userStr) return null;
   try {
     return JSON.parse(userStr);
@@ -617,6 +620,6 @@ export const getStoredUser = (): BackendUser | null => {
 };
 
 export const clearAuth = (): void => {
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('user');
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
 };
