@@ -87,8 +87,9 @@ export function BudgetsPage() {
   const filteredBudgets = budgets.filter(b => b.month === selectedMonth);
   const globalBudget = filteredBudgets.find(b => !b.categoryId);
 
-  // Categorías disponibles para asignar presupuesto (del contexto)
-  const availableCategories = categories.filter(c => !c.isDefault);
+  // Categorías disponibles para asignar presupuesto
+  // Incluye tanto categorías globales del sistema como personalizadas del usuario
+  const availableCategories = categories;
 
   // Calcular gasto total del mes
   const getTotalSpent = () => {
