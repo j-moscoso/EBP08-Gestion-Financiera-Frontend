@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import type { Transaction, Category, Budget, User, ScheduledTransaction } from '../types';
 import * as api from '../services/api';
 import {
@@ -48,26 +48,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Cargar usuario desde localStorage al iniciar
-  useEffect(() => {
-    const token = api.getToken();
-    const storedUser = api.getStoredUser();
-
-    if (token && storedUser) {
-      // Si hay token y usuario guardado, restaurar sesión
-      setUser(mapBackendUser(storedUser));
-      loadUserData();
-    } else if (token) {
-      // Si solo hay token, crear usuario temporal y cargar datos
-      setUser({
-        id: 'pending',
-        name: 'Usuario',
-        email: ''
-      });
-      loadUserData();
-    }
-  }, [loadUserData]);
-
   // Función para iniciar sesión
   const loginWithCredentials = async (email: string, password: string): Promise<User> => {
     setLoading(true);
@@ -84,7 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       setUser(temporalUser);
 
-      // Paso 3: Cargar todos los datos del usuario (secuencial)
+      // Paso 3: Cargar todos los datos del usuario
       await loadUserData();
 
       return temporalUser;
@@ -136,7 +116,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const mappedTransactions = backendTransactions.map(mapBackendTransaction);
       setTransactions(mappedTransactions);
 
-      // Paso 3: Cargar transacciones programadas
+      // Cargar transacciones programadas (ingresos + gastos)
       const [backendIncomes, backendExpenses] = await Promise.all([
         api.getScheduledIncomes(),
         api.getScheduledExpenses(),
@@ -147,7 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ];
       setScheduledTransactions(mappedScheduled);
 
-      // Paso 4: Cargar presupuestos
+      // Cargar presupuestos (global + por categoría)
       const currentMonth = new Date().toISOString().slice(0, 7);
       const [globalBudget, categoryBudgets] = await Promise.all([
         api.getGlobalBudgetSummary(),
@@ -156,11 +136,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const mappedBudgets: Budget[] = [];
 
+      // Presupuesto global
       const globalMapped = mapBackendBudget(globalBudget, currentMonth);
       if (globalMapped) {
         mappedBudgets.push(globalMapped);
       }
 
+      // Presupuestos por categoría
       categoryBudgets.forEach(catBudget => {
         const mapped = mapBackendBudget(catBudget, currentMonth);
         if (mapped) {
@@ -169,13 +151,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
       setBudgets(mappedBudgets);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al cargar datos del usuario:', error);
-      toast.error('Error al cargar los datos');
+      toast.error(error.message || 'Error al cargar los datos');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // Cargar usuario desde localStorage al iniciar
+  useEffect(() => {
+    const token = api.getToken();
+    const storedUser = api.getStoredUser();
+
+    if (token && storedUser) {
+      // Si hay token y usuario guardado, restaurar sesión
+      setUser(mapBackendUser(storedUser));
+      loadUserData();
+    }
+  }, [loadUserData]);
 
   // Función para cambiar contraseña
   const changePassword = async (oldPassword: string, newPassword: string): Promise<void> => {

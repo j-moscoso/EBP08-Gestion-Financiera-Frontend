@@ -97,32 +97,51 @@ const getAuthHeaders = (): HeadersInit => {
 };
 
 const handleResponse = async <T>(response: Response): Promise<T> => {
+  // Manejar errores de autenticación
   if (response.status === 401 || response.status === 403) {
     const token = localStorage.getItem('authToken');
+    // Solo limpiar sesión si hay token guardado y no estamos en login
     if (token && !window.location.pathname.includes('/login')) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
-    const error = await response.text();
-    throw new Error(error || 'No autorizado');
+    // Leer el mensaje de error del backend
+    let errorMessage = 'No autorizado';
+    try {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    } catch {
+      // Si no se puede leer el texto, usar mensaje por defecto
+    }
+    throw new Error(errorMessage);
   }
 
+  // Manejar otros errores HTTP
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || `Error ${response.status}`);
+    let errorMessage = `Error ${response.status}`;
+    try {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    } catch {
+      // Si no se puede leer el texto, usar mensaje por defecto
+    }
+    throw new Error(errorMessage);
   }
 
+  // Manejar respuestas exitosas sin contenido
+  if (response.status === 204) {
+    return null as T;
+  }
+
+  // Manejar respuestas de texto plano
   const contentType = response.headers.get('content-type');
   if (contentType && contentType.includes('text/plain')) {
     const text = await response.text();
     return text as T;
   }
 
-  if (response.status === 204) {
-    return null as T;
-  }
-
+  // Manejar respuestas JSON
   return response.json();
 };
 

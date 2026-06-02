@@ -38,7 +38,9 @@ export function LoginPage() {
       toast.success('¡Bienvenido!');
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Correo electrónico o contraseña incorrectos');
+      const errorMessage = err.message || 'Correo electrónico o contraseña incorrectos';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
