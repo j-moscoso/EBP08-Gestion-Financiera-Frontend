@@ -286,10 +286,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
   ): Promise<User> => {
+    // Primero crear el usuario
     const created = await api.registerUsuario(name.trim(), email.trim(), password);
-    const token = await api.loginUsuario(email.trim(), password);
-    api.saveAuthToken(token);
-    api.saveRecoveryCodes(created.codigosRecuperacion);
+    // Persistir códigos de recuperación si vienen
+    try {
+      api.saveRecoveryCodes(created.codigosRecuperacion ?? []);
+    } catch {
+      // ignore storage errors
+    }
+
+    // Intentar iniciar sesión automáticamente; si falla, informamos
+    try {
+      const token = await api.loginUsuario(email.trim(), password);
+      api.saveAuthToken(token);
+    } catch (err) {
+      const appUser = mapUsuarioRegistro(created.usuario);
+      // Guardar usuario parcialmente (no autenticado)
+      api.saveUser({ id: appUser.id, name: appUser.name, email: appUser.email });
+      setUser(appUser);
+      throw new Error(
+        `Registro creado correctamente, pero no fue posible iniciar sesión automáticamente: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
 
     const appUser = mapUsuarioRegistro(created.usuario);
     api.saveUser({

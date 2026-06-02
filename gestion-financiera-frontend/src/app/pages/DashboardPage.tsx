@@ -19,7 +19,7 @@ function transactionYearMonth(dateStr: string): string {
 }
 
 export function DashboardPage() {
-  const { transactions, addTransaction, categories } = useApp();
+  const { transactions, addTransaction, categories, budgets } = useApp();
   const [selectedMonth, setSelectedMonth] = useState(yearMonthLocal);
 
   const filteredTransactions = transactions.filter(
