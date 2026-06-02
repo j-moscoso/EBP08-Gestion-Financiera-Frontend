@@ -379,8 +379,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // El backend mueve las transacciones a categoría por defecto automáticamente
       setCategories(categories.filter(c => c.id !== id));
 
-      // Recargar transacciones para ver las actualizadas
-      await loadTransactions();
+      // Recargar transacciones - si falla (404), es porque la categoría ya no existe (correcto)
+      try {
+        await loadTransactions();
+      } catch (error) {
+        // Ignorar errores 404 al recargar - la categoría ya no existe
+        console.log('[deleteCategory] Categoría eliminada, transacciones reasignadas');
+      }
+
       toast.success('Categoría eliminada');
     } catch (error: any) {
       toast.error(error.message || 'Error al eliminar la categoría');

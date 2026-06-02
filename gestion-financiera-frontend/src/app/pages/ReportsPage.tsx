@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { TrendingUp, TrendingDown, DollarSign, BarChart3, PieChart } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, BarChart3, PieChart, Download } from 'lucide-react';
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { exportExpensesByCategory, exportIncomeByCategory, exportMonthlyComparison } from '../services/api';
+import { toast } from 'sonner';
 
 type TabType = 'expenses' | 'incomes' | 'comparison';
 
@@ -105,6 +107,46 @@ export function ReportsPage() {
 
   const hasData = monthTransactions.length > 0;
 
+  const handleExport = async (type: 'csv' | 'pdf') => {
+    try {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      let blob: Blob;
+      let filename: string;
+
+      switch (activeTab) {
+        case 'expenses':
+          blob = await exportExpensesByCategory(type, month, year);
+          filename = `gastos-por-categoria-${selectedMonth}.${type}`;
+          break;
+        case 'incomes':
+          blob = await exportIncomeByCategory(type, month, year);
+          filename = `ingresos-por-categoria-${selectedMonth}.${type}`;
+          break;
+        case 'comparison':
+          blob = await exportMonthlyComparison(type, month, year);
+          filename = `comparativo-mensual-${selectedMonth}.${type}`;
+          break;
+        default:
+          return;
+      }
+
+      // Crear enlace de descarga
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`Reporte exportado como ${type.toUpperCase()}`);
+    } catch (error: any) {
+      console.error('[ReportsPage] Error al exportar:', error);
+      toast.error(error.message || 'Error al exportar el reporte');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
@@ -115,21 +157,44 @@ export function ReportsPage() {
         </p>
       </div>
 
-      {/* Filtro de mes */}
+      {/* Filtro de mes y exportación */}
       <div className="bg-card p-4 rounded-xl shadow-md border border-border">
-        <div className="flex items-center gap-4">
-          <label className="text-foreground">Periodo:</label>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-          >
-            {monthOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <label className="text-foreground">Periodo:</label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+            >
+              {monthOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Botones de exportación */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Exportar:</span>
+            <button
+              onClick={() => handleExport('pdf')}
+              className="flex items-center gap-2 px-3 py-2 bg-destructive/10 text-destructive rounded-lg hover:bg-destructive/20 transition-colors text-sm"
+              disabled={!hasData}
+            >
+              <Download className="w-4 h-4" />
+              PDF
+            </button>
+            <button
+              onClick={() => handleExport('csv')}
+              className="flex items-center gap-2 px-3 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm"
+              disabled={!hasData}
+            >
+              <Download className="w-4 h-4" />
+              CSV
+            </button>
+          </div>
         </div>
       </div>
 

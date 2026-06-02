@@ -68,16 +68,12 @@ export function CategoriesPage() {
     if (!deletingCategory) return;
 
     try {
-      if (deletingCategory.backendId) {
-        await apiDeleteCategory(deletingCategory.backendId);
-      }
-    } catch {
-      // Si falla el backend, igual eliminamos localmente
+      await deleteCategory(deletingCategory.id);
+      setDeletingCategory(null);
+    } catch (error) {
+      // Error ya manejado en el contexto
+      setDeletingCategory(null);
     }
-
-    deleteCategory(deletingCategory.id);
-    toast.success('Categoría eliminada');
-    setDeletingCategory(null);
   };
 
   const getCategoryUsageCount = (categoryId: string) => {

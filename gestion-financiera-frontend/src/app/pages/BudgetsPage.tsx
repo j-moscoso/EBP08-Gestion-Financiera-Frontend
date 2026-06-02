@@ -1,7 +1,16 @@
-import { useState } from 'react';
-import { Plus, Target, AlertCircle, Calendar, TrendingDown, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Target, AlertCircle, Calendar, TrendingDown, CheckCircle2, Bell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
+import { getUserAlerts } from '../services/api';
+
+interface Alert {
+  id: number;
+  presupuestoId: number;
+  tipo: string;
+  mensaje: string;
+  fecha: string;
+}
 
 export function BudgetsPage() {
   const { budgets, addBudget, categories, transactions } = useApp();
@@ -11,6 +20,22 @@ export function BudgetsPage() {
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+
+  // Cargar alertas al montar el componente y cuando cambie el mes
+  useEffect(() => {
+    const loadAlerts = async () => {
+      try {
+        const userAlerts = await getUserAlerts();
+        setAlerts(userAlerts);
+      } catch (error: any) {
+        console.error('[BudgetsPage] Error al cargar alertas:', error);
+        // No mostrar toast de error para alertas, es opcional
+      }
+    };
+
+    loadAlerts();
+  }, [selectedMonth]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +111,15 @@ export function BudgetsPage() {
     return transactions
       .filter(t => t.type === 'expense' && t.date.startsWith(selectedMonth))
       .reduce((sum, t) => sum + t.amount, 0);
+  };
+
+  // Obtener alertas para un presupuesto específico
+  const getBudgetAlerts = (budgetId: string) => {
+    // El backendId del presupuesto debería coincidir con el presupuestoId de la alerta
+    const budget = budgets.find(b => b.id === budgetId);
+    if (!budget?.backendId) return [];
+
+    return alerts.filter(alert => alert.presupuestoId === budget.backendId);
   };
 
   const totalSpent = getTotalSpent();
@@ -378,6 +412,7 @@ export function BudgetsPage() {
 
               const progress = getProgress(spent, budget.amount);
               const available = Math.max(budget.amount - spent, 0);
+              const budgetAlerts = getBudgetAlerts(budget.id);
 
               return (
                 <div
@@ -404,6 +439,25 @@ export function BudgetsPage() {
                     </div>
                     {getStatusIcon(progress)}
                   </div>
+
+                  {/* Alertas */}
+                  {budgetAlerts.length > 0 && (
+                    <div className="mb-4 space-y-2">
+                      {budgetAlerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-start gap-2"
+                        >
+                          <Bell className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-orange-700 dark:text-orange-400 text-sm">
+                              {alert.mensaje}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="space-y-2 mb-3">
                     <div className="flex justify-between">

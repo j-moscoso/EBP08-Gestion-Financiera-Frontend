@@ -20,9 +20,10 @@ export function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
   // Filtrar transacciones por mes
+  // Comparar directamente las cadenas de fecha sin crear Date objects
+  // para evitar problemas de zona horaria
   const filteredTransactions = transactions.filter(t => {
-    const transactionMonth = new Date(t.date).toISOString().slice(0, 7);
-    return transactionMonth === selectedMonth;
+    return t.date.startsWith(selectedMonth);
   });
 
   return (

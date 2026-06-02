@@ -585,6 +585,78 @@ export const getMonthlyComparison = async (month?: number, year?: number) => {
   }>(response);
 };
 
+export const exportExpensesByCategory = async (type: 'csv' | 'pdf', month?: number, year?: number): Promise<Blob> => {
+  const params = new URLSearchParams();
+  params.append('type', type);
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
+
+  const response = await fetch(`${BASE_URL}/reports/expenses/export?${params.toString()}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error al exportar: ${response.status}`);
+  }
+
+  return response.blob();
+};
+
+export const exportIncomeByCategory = async (type: 'csv' | 'pdf', month?: number, year?: number): Promise<Blob> => {
+  const params = new URLSearchParams();
+  params.append('type', type);
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
+
+  const response = await fetch(`${BASE_URL}/reports/income/export?${params.toString()}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error al exportar: ${response.status}`);
+  }
+
+  return response.blob();
+};
+
+export const exportMonthlySummary = async (type: 'csv' | 'pdf', month?: number, year?: number): Promise<Blob> => {
+  const params = new URLSearchParams();
+  params.append('type', type);
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
+
+  const response = await fetch(`${BASE_URL}/reports/export?${params.toString()}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error al exportar: ${response.status}`);
+  }
+
+  return response.blob();
+};
+
+export const exportMonthlyComparison = async (type: 'csv' | 'pdf', month?: number, year?: number): Promise<Blob> => {
+  const params = new URLSearchParams();
+  params.append('type', type);
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
+
+  const response = await fetch(`${BASE_URL}/reports/monthly-comparison/export?${params.toString()}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error al exportar: ${response.status}`);
+  }
+
+  return response.blob();
+};
+
 // ===== ALERTAS =====
 
 export const getUserAlerts = async () => {
