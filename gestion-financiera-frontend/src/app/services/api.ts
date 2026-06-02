@@ -230,12 +230,18 @@ async function handleJsonResponse<T>(response: Response, opts?: { allow401Naviga
     }
     const text = await response.text();
     const msg = parseMaybeJsonMessage(text) || text?.trim();
+    // Log for easier debugging in production
+    // eslint-disable-next-line no-console
+    console.error('API auth error', { url: response.url, status: response.status, body: text });
     throw new Error(msg || 'Sesión expirada o acceso denegado');
   }
 
   if (!response.ok) {
     const text = await response.text();
     const msg = parseMaybeJsonMessage(text) || text?.trim();
+    // Log non-ok responses to help diagnose 404/500 from backend
+    // eslint-disable-next-line no-console
+    console.error('API request failed', { url: response.url, status: response.status, body: text });
     throw new Error(msg || `Error ${response.status}`);
   }
 
@@ -253,10 +259,19 @@ async function handleJsonResponse<T>(response: Response, opts?: { allow401Naviga
 }
 
 async function fetchAuthorized(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${BASE_URL}${path}`, {
-    ...init,
-    headers: mergeHeaders(init?.headers),
-  });
+  const fullUrl = `${BASE_URL}${path}`;
+  try {
+    // eslint-disable-next-line no-console
+    console.debug('API fetch', { url: fullUrl, method: init?.method ?? 'GET' });
+    return await fetch(fullUrl, {
+      ...init,
+      headers: mergeHeaders(init?.headers),
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('API fetch error', { url: fullUrl, error: err });
+    throw err;
+  }
 }
 
 // ——— Usuarios ———
