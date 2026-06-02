@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AlertCircle, TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Info } from 'lucide-react';
+import { obtenerRecomendacionAlertas, obtenerRecomendacionBalance } from '../services/api';
 
 interface Recommendation {
   id: string;
@@ -12,6 +14,42 @@ interface Recommendation {
 export function RecommendationsPage() {
   const { transactions, budgets, categories } = useApp();
   const currentMonth = new Date().toISOString().slice(0, 7);
+  const [backendBalanceRecommendation, setBackendBalanceRecommendation] = useState('');
+  const [backendAlertRecommendation, setBackendAlertRecommendation] = useState('');
+  const [backendLoading, setBackendLoading] = useState(true);
+  const [backendError, setBackendError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setBackendLoading(true);
+    setBackendError('');
+
+    void (async () => {
+      try {
+        const [balanceRecommendation, alertRecommendation] = await Promise.all([
+          obtenerRecomendacionBalance(),
+          obtenerRecomendacionAlertas(),
+        ]);
+
+        if (cancelled) return;
+
+        setBackendBalanceRecommendation(balanceRecommendation);
+        setBackendAlertRecommendation(alertRecommendation);
+      } catch (err) {
+        if (cancelled) return;
+        setBackendError(err instanceof Error ? err.message : 'No se pudieron cargar las recomendaciones del backend');
+      } finally {
+        if (!cancelled) {
+          setBackendLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const monthTransactions = transactions.filter((transaction) => transaction.date.startsWith(currentMonth));
   const totalIncome = monthTransactions.filter((transaction) => transaction.type === 'income').reduce((sum, transaction) => sum + transaction.amount, 0);
@@ -193,6 +231,47 @@ export function RecommendationsPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div>
+        <h2 className="text-foreground mb-4">Recomendaciones del backend</h2>
+        {backendError ? (
+          <div className="bg-card p-5 rounded-xl shadow-md border border-border">
+            <p className="text-muted-foreground text-sm">{backendError}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-card p-5 rounded-xl shadow-md border border-border">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Según tu balance</p>
+                  <p className="text-foreground">Recomendación generada por el backend</p>
+                </div>
+              </div>
+              <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                {backendLoading ? 'Cargando recomendación...' : backendBalanceRecommendation || 'No hay recomendación disponible.'}
+              </p>
+            </div>
+
+            <div className="bg-card p-5 rounded-xl shadow-md border border-border">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Según tus alertas</p>
+                  <p className="text-foreground">Recomendación generada por el backend</p>
+                </div>
+              </div>
+              <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                {backendLoading ? 'Cargando recomendación...' : backendAlertRecommendation || 'No hay recomendación disponible.'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>

@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
-import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
+import { Mail, ArrowLeft, CheckCircle, KeyRound } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { toast } from 'sonner';
 import logo from '../../imports/Logo_login.png';
 
 export function ForgotPasswordPage() {
-  const { sendPasswordResetEmail } = useApp();
+  const navigate = useNavigate();
+  const { recoverPassword } = useApp();
   const [email, setEmail] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -20,9 +24,25 @@ export function ForgotPasswordPage() {
       return;
     }
 
-    // Simular envío de correo
-    sendPasswordResetEmail(email);
-    setSuccess(true);
+    if (!recoveryCode.trim()) {
+      setError('Ingresa el código de recuperación');
+      return;
+    }
+
+    setLoading(true);
+
+    void (async () => {
+      try {
+        const token = await recoverPassword(email.trim(), recoveryCode.trim());
+        setSuccess(true);
+        toast.success('Código validado correctamente');
+        navigate(`/reset-password?token=${encodeURIComponent(token)}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo validar el código');
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   if (success) {
@@ -40,19 +60,12 @@ export function ForgotPasswordPage() {
           <div className="bg-card p-8 rounded-2xl shadow-xl border border-border">
             <div className="text-center">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-primary" />
+                <KeyRound className="w-8 h-8 text-primary" />
               </div>
-              <h1 className="text-foreground mb-3">Revisa tu correo</h1>
+              <h1 className="text-foreground mb-3">Código validado</h1>
               <p className="text-muted-foreground mb-6">
-                Si el correo existe en nuestro sistema, recibirás instrucciones para restablecer tu contraseña.
+                Redirigiendo al formulario para crear tu nueva contraseña.
               </p>
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-2 text-primary hover:underline"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Volver al inicio de sesión
-              </Link>
             </div>
           </div>
         </div>
@@ -96,16 +109,37 @@ export function ForgotPasswordPage() {
                   required
                 />
               </div>
-              {error && (
-                <p className="text-destructive text-sm mt-2">{error}</p>
-              )}
             </div>
+
+            <div>
+              <label htmlFor="recoveryCode" className="block text-foreground mb-2">
+                Código de recuperación
+              </label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <input
+                  id="recoveryCode"
+                  type="text"
+                  value={recoveryCode}
+                  onChange={(e) => {
+                    setRecoveryCode(e.target.value);
+                    setError('');
+                  }}
+                  className="w-full pl-11 pr-4 py-3 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Ingresa el código recibido"
+                  required
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-destructive text-sm mt-2">{error}</p>}
 
             <button
               type="submit"
+              disabled={loading}
               className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:opacity-90 transition-opacity"
             >
-              Enviar instrucciones
+              {loading ? 'Validando...' : 'Continuar'}
             </button>
           </form>
 

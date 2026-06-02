@@ -1,9 +1,10 @@
 /** Base URL debe incluir el prefijo `/api`. */
+const viteEnv = import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } };
 const RAW_BASE =
-  typeof import.meta.env.VITE_API_BASE_URL === 'string' &&
-  import.meta.env.VITE_API_BASE_URL.trim().length > 0
-    ? import.meta.env.VITE_API_BASE_URL.trim()
-    : 'https://ebp08-gestion-financiera-backend.onrender.com/api';
+  typeof viteEnv.env?.VITE_API_BASE_URL === 'string' &&
+  viteEnv.env.VITE_API_BASE_URL.trim().length > 0
+    ? viteEnv.env.VITE_API_BASE_URL.trim()
+    : 'https://eko-mj59.onrender.com/api';
 
 export const BASE_URL = RAW_BASE.replace(/\/+$/, '');
 
@@ -15,6 +16,13 @@ export interface BackendUsuario {
   nombre: string;
   correo: string;
   clave?: string;
+  fechaRegistro?: string;
+  estado?: string;
+}
+
+export interface BackendRegistroResponse {
+  usuario: BackendUsuario;
+  codigosRecuperacion: string[];
 }
 
 interface BackendUsuarioNested {
@@ -53,6 +61,52 @@ export interface BackendTransaccionProgramada {
   categoria?: { id?: number };
 }
 
+export interface ReporteGastosCategoriaApi {
+  idCategoria: number;
+  nombreCategoria: string;
+  totalGastado: number | string;
+  cantidadTransacciones: number;
+}
+
+export interface ReporteIngresosCategoriaApi {
+  idCategoria: number;
+  nombreCategoria: string;
+  totalIngresado: number | string;
+  cantidadTransacciones: number;
+}
+
+export interface ResumenMensualApi {
+  totalIngresos: number | string;
+  totalEgresos: number | string;
+  balance: number | string;
+  porcentajeAhorro: number | string;
+  mes: number;
+  anio: number;
+}
+
+export interface ComparativoMensualApi {
+  nombreUsuario: string;
+  mes: number;
+  anio: number;
+  totalIngresos: number | string;
+  totalGastos: number | string;
+  balance: number | string;
+  estadoBalance: string;
+  montoDeficit: number | string;
+  porcentajeAhorro: number | string;
+  datosGrafico: {
+    ingresos: number | string;
+    gastos: number | string;
+  };
+  movimientosResumen: Array<{
+    fecha: string;
+    tipo: TipoTransaccionApi;
+    categoria: string;
+    monto: number | string;
+    descripcion?: string;
+  }>;
+}
+
 export interface ResumenPresupuestoGlobal {
   presupuestoDefinido: boolean;
   montoLimite?: number | string | null;
@@ -75,6 +129,7 @@ export interface ResumenPresupuestoCategoria {
 
 const TOKEN_KEY = 'authToken';
 const USER_KEY = 'user';
+const RECOVERY_CODES_KEY = 'recoveryCodes';
 
 export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
 
@@ -84,6 +139,21 @@ export const saveAuthToken = (token: string): void => {
 
 export const saveUser = (user: StoredUserPayload): void => {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+};
+
+export const saveRecoveryCodes = (codes: string[]): void => {
+  localStorage.setItem(RECOVERY_CODES_KEY, JSON.stringify(codes));
+};
+
+export const getRecoveryCodes = (): string[] => {
+  const raw = localStorage.getItem(RECOVERY_CODES_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+  } catch {
+    return [];
+  }
 };
 
 export interface StoredUserPayload {
@@ -195,13 +265,15 @@ export const registerUsuario = async (
   nombre: string,
   correo: string,
   clave: string,
-): Promise<BackendUsuario> => {
+): Promise<BackendRegistroResponse> => {
   const response = await fetch(`${BASE_URL}/usuarios/registro`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nombre, correo, clave }),
   });
-  const data = await handleJsonResponse<BackendUsuario>(response, { allow401Navigate: false });
+  const data = await handleJsonResponse<BackendRegistroResponse>(response, {
+    allow401Navigate: false,
+  });
   return data;
 };
 
@@ -248,6 +320,30 @@ export const logoutUsuarioRemoto = async (): Promise<void> => {
   } catch {
     /* ignore network errors on logout */
   }
+};
+
+export const recuperarPasswordUsuario = async (
+  correo: string,
+  codigo: string,
+): Promise<string> => {
+  const response = await fetch(`${BASE_URL}/usuarios/recover`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ correo, codigo }),
+  });
+  return handleJsonResponse<string>(response, { allow401Navigate: false });
+};
+
+export const resetPasswordConTokenTemporal = async (
+  tokenTemporal: string,
+  nuevaClave: string,
+): Promise<string> => {
+  const response = await fetch(`${BASE_URL}/usuarios/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tokenTemporal, nuevaClave }),
+  });
+  return handleJsonResponse<string>(response, { allow401Navigate: false });
 };
 
 export const actualizarClaveUsuario = async (claveAntigua: string, claveNueva: string): Promise<string> => {
@@ -418,4 +514,60 @@ export const obtenerResumenPresupuestoGlobal = async (): Promise<ResumenPresupue
 export const obtenerResumenPresupuestosCategoria = async (): Promise<ResumenPresupuestoCategoria[]> => {
   const response = await fetchAuthorized('/presupuestos/categorias/usuario');
   return handleJsonResponse<ResumenPresupuestoCategoria[]>(response);
+};
+
+function buildMonthQuery(month?: number, year?: number): string {
+  const params = new URLSearchParams();
+  if (typeof month === 'number' && month > 0) {
+    params.set('month', String(month));
+  }
+  if (typeof year === 'number' && year > 0) {
+    params.set('year', String(year));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
+export const obtenerReporteGastosPorCategoria = async (
+  month?: number,
+  year?: number,
+): Promise<ReporteGastosCategoriaApi[]> => {
+  const response = await fetchAuthorized(`/reports/expenses${buildMonthQuery(month, year)}`);
+  return handleJsonResponse<ReporteGastosCategoriaApi[]>(response);
+};
+
+export const obtenerReporteIngresosPorCategoria = async (
+  month?: number,
+  year?: number,
+): Promise<ReporteIngresosCategoriaApi[]> => {
+  const response = await fetchAuthorized(`/reports/income${buildMonthQuery(month, year)}`);
+  return handleJsonResponse<ReporteIngresosCategoriaApi[]>(response);
+};
+
+export const obtenerResumenMensual = async (
+  month?: number,
+  year?: number,
+): Promise<ResumenMensualApi> => {
+  const response = await fetchAuthorized(`/reports/summary${buildMonthQuery(month, year)}`);
+  return handleJsonResponse<ResumenMensualApi>(response);
+};
+
+export const obtenerComparativoMensual = async (
+  month?: number,
+  year?: number,
+): Promise<ComparativoMensualApi> => {
+  const response = await fetchAuthorized(
+    `/reports/monthly-comparison${buildMonthQuery(month, year)}`,
+  );
+  return handleJsonResponse<ComparativoMensualApi>(response);
+};
+
+export const obtenerRecomendacionBalance = async (): Promise<string> => {
+  const response = await fetchAuthorized('/recomendaciones/balance');
+  return handleJsonResponse<string>(response);
+};
+
+export const obtenerRecomendacionAlertas = async (): Promise<string> => {
+  const response = await fetchAuthorized('/recomendaciones/alertas');
+  return handleJsonResponse<string>(response);
 };

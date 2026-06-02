@@ -173,8 +173,8 @@ interface AppContextType {
   registerAndSignIn: (name: string, email: string, password: string) => Promise<User>;
   validateLogin: (email: string, password: string) => Promise<User | null>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
-  sendPasswordResetEmail: (email: string) => boolean;
-  resetPassword: (token: string, newPassword: string) => boolean;
+  recoverPassword: (email: string, code: string) => Promise<string>;
+  resetPassword: (token: string, newPassword: string) => Promise<boolean>;
   transactions: Transaction[];
   setTransactions: (transactions: Transaction[]) => void;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
@@ -289,8 +289,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const created = await api.registerUsuario(name.trim(), email.trim(), password);
     const token = await api.loginUsuario(email.trim(), password);
     api.saveAuthToken(token);
+    api.saveRecoveryCodes(created.codigosRecuperacion);
 
-    const appUser = mapUsuarioRegistro(created);
+    const appUser = mapUsuarioRegistro(created.usuario);
     api.saveUser({
       id: appUser.id,
       name: appUser.name,
@@ -333,19 +334,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await api.actualizarClaveUsuario(oldPassword, newPassword);
       return true;
     } catch (err) {
-    if (err instanceof Error) {
-      throw new Error(err.message);
+      if (err instanceof Error) {
+        throw new Error(err.message);
+      }
+      throw new Error('No se pudo actualizar la contraseña. Intenta de nuevo.');
     }
-    throw new Error('No se pudo actualizar la contraseña. Intenta de nuevo.');
-  }
   };
 
-  const sendPasswordResetEmail = (_email: string) => {
+  const recoverPassword = async (email: string, code: string): Promise<string> => {
+    return api.recuperarPasswordUsuario(email.trim(), code.trim());
+  };
+
+  const resetPassword = async (token: string, newPassword: string): Promise<boolean> => {
+    await api.resetPasswordConTokenTemporal(token.trim(), newPassword);
     return true;
-  };
-
-  const resetPassword = (_token: string, _newPassword: string) => {
-    return false;
   };
 
   const addScheduledTransaction = async (t: Omit<ScheduledTransaction, 'id'>) => {
@@ -428,7 +430,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         registerAndSignIn,
         validateLogin,
         changePassword,
-        sendPasswordResetEmail,
+        recoverPassword,
         resetPassword,
         transactions,
         setTransactions,
