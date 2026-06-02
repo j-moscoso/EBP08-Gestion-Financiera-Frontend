@@ -79,7 +79,7 @@ export function RegisterPage() {
             alt="Logo"
             className="w-20 h-20 object-contain mx-auto mb-4"
           />
-          <h1 className="text-foreground mb-2">Crear Cuenta</h1>
+          <h1 className="text-foreground mb-2">EKO - Gestión Financiera</h1>
           <p className="text-muted-foreground">Comienza a gestionar tus finanzas personales</p>
         </div>
 

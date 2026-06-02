@@ -64,7 +64,7 @@ export function LoginPage() {
         {/* Logo y Header */}
         <div className="text-center mb-8">
           <AppLogo className="h-20 w-auto mx-auto mb-4" />
-          <h1 className="text-foreground mb-2">Gestión Financiera</h1>
+          <h1 className="text-foreground mb-2">EKO - Gestión Financiera</h1>
           <p className="text-muted-foreground">Ingresa a tu cuenta para continuar</p>
         </div>
 

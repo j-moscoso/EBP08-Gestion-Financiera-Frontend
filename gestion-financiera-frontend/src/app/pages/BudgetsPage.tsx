@@ -9,7 +9,6 @@ export function BudgetsPage() {
   const { budgets, addBudget, transactions, alerts, categories } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [budgetType, setBudgetType] = useState<'global' | 'category'>('global');
-  const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -33,8 +32,8 @@ export function BudgetsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name || !amount) {
-      toast.error('Por favor completa todos los campos');
+    if (!amount) {
+      toast.error('Por favor ingresa el monto límite');
       return;
     }
 
@@ -44,7 +43,7 @@ export function BudgetsPage() {
     }
 
     addBudget({
-      name,
+      name: budgetType === 'global' ? 'Presupuesto Global' : 'Presupuesto de Categoría',
       amount: parseFloat(amount),
       spent: 0,
       categoryId: budgetType === 'category' ? categoryId : undefined,
@@ -54,7 +53,6 @@ export function BudgetsPage() {
     toast.success('Presupuesto creado exitosamente');
 
     // Reset form
-    setName('');
     setAmount('');
     setCategoryId('');
     setShowForm(false);
@@ -172,39 +170,21 @@ export function BudgetsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Nombre */}
-              <div>
-                <label htmlFor="name" className="block text-foreground mb-2">
-                  Nombre del presupuesto
-                </label>
-                <input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Ej: Presupuesto mensual"
-                  required
-                />
-              </div>
-
-              {/* Monto */}
-              <div>
-                <label htmlFor="amount" className="block text-foreground mb-2">
-                  Monto límite
-                </label>
-                <input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
+            {/* Monto */}
+            <div>
+              <label htmlFor="amount" className="block text-foreground mb-2">
+                Monto límite
+              </label>
+              <input
+                id="amount"
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="0.00"
+                required
+              />
             </div>
 
             {/* Categoría (solo si es por categoría) */}
